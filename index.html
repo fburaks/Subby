@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Subby</title>
+  <meta name="description" content="Aboneliklerini tek yerden takip et.">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Subby">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main id="view" class="view" aria-live="polite"></main>
+
+  <nav class="tabbar" role="tablist">
+    <button class="tab" data-tab="home" role="tab"><span class="tab-ico">◉</span><span>Özet</span></button>
+    <button class="tab" data-tab="list" role="tab"><span class="tab-ico">☰</span><span>Abonelikler</span></button>
+    <button class="tab-add" id="addBtn" aria-label="Abonelik ekle">+</button>
+    <button class="tab" data-tab="calendar" role="tab"><span class="tab-ico">▦</span><span>Takvim</span></button>
+    <button class="tab" data-tab="settings" role="tab"><span class="tab-ico">⚙︎</span><span>Ayarlar</span></button>
+  </nav>
+
+  <div id="sheetRoot"></div>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
