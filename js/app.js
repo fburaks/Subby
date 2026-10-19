@@ -106,6 +106,55 @@ function toast(msg) {
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 
+// ---------------------------------------------------------------- widget (Scriptable)
+
+const WIDGET_SCRIPT = "Subby"; // Scriptable'daki betik adı
+
+// "#111" → "#111111" (Scriptable 6 haneli renk bekler)
+const hex6 = (h) => (/^#[0-9a-f]{3}$/i.test(h) ? "#" + [...h.slice(1)].map((c) => c + c).join("") : h);
+
+function widgetPayload() {
+  const subs = activeSubs().map((s) => {
+    const svc = s.catalogId && CATALOG_BY_ID[s.catalogId];
+    return [s.name, s.price, s.currency, s.cycle, s.startDate, hex6(s.color || svc?.color || hashColor(s.name)),
+      hex6(s.fg || svc?.fg || "#ffffff"), s.abbr ?? svc?.abbr ?? initials(s.name), s.trialEnd || ""];
+  });
+  return { v: 1, rates: state.settings.rates, subs };
+}
+
+function widgetHash() {
+  const str = JSON.stringify(widgetPayload());
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+  return String(h);
+}
+
+function updateWidget() {
+  if (!activeSubs().length) return toast("Önce abonelik ekle");
+  const data = JSON.stringify({ ...widgetPayload(), savedAt: new Date().toISOString() });
+  state.settings.widgetHash = widgetHash();
+  save();
+  render();
+  window.location.href = `scriptable:///run/${encodeURIComponent(WIDGET_SCRIPT)}?data=${encodeURIComponent(data)}`;
+  setTimeout(() => { if (document.visibilityState === "visible") toast("Scriptable açılmadıysa önce 1. ve 2. adımı yap"); }, 1500);
+}
+
+async function copyWidgetScript() {
+  const url = "widget/subby-widget.js";
+  try {
+    // Safari, panoya yazmanın dokunuşla aynı anda başlamasını ister; Promise ile ClipboardItem bunu sağlar.
+    if (window.ClipboardItem && navigator.clipboard?.write) {
+      await navigator.clipboard.write([new ClipboardItem({ "text/plain": fetch(url).then((r) => (r.ok ? r.text() : Promise.reject())).then((t) => new Blob([t], { type: "text/plain" })) })]);
+    } else {
+      await navigator.clipboard.writeText(await (await fetch(url)).text());
+    }
+    toast("Betik kopyalandı ✓ Scriptable'a yapıştır");
+  } catch {
+    window.open(url, "_blank");
+    toast("Açılan sayfada tümünü seçip kopyala");
+  }
+}
+
 // ---------------------------------------------------------------- views
 
 function render() {
@@ -163,6 +212,9 @@ function viewHome() {
     alerts.push(`<div class="alert" data-action="open" data-id="${s.id}">💳 <div><b>${esc(s.name)}</b> ödemesi ${relDay(n).toLocaleLowerCase("tr")}: <b>${money(s.price, s.currency)}</b></div></div>`);
   }
   html += alerts.join("");
+  if (state.settings.widgetHash && state.settings.widgetHash !== widgetHash()) {
+    html += `<div class="alert" data-action="widget-update">🧩 <div>Aboneliklerin değişti. <b>Widget'ı güncellemek için dokun.</b></div></div>`;
+  }
 
   // Upcoming 30 days
   const horizon = D.addDays(today, 30);
@@ -331,6 +383,14 @@ function viewSettings() {
 
     <div class="section-title"><span>Otomatik tanıma</span></div>
     <div class="card"><button class="row" data-action="detect"><div class="logo sm" style="background:var(--accent)">✨</div><div class="row-main"><div class="row-title">Banka SMS / ekstresinden tanı</div><div class="row-sub">Metni yapıştır, abonelikler otomatik bulunsun</div></div><span class="muted">›</span></button></div>
+
+    <div class="section-title"><span>Ana ekran widget'ı</span></div>
+    <div class="card">
+      <a class="row" href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><div class="logo sm" style="background:#1c1c1e">1</div><div class="row-main"><div class="row-title">Scriptable'ı yükle</div><div class="row-sub">App Store'dan ücretsiz</div></div><span class="muted">↗</span></a>
+      <button class="row" data-action="widget-copy"><div class="logo sm" style="background:#5e5ce6">2</div><div class="row-main"><div class="row-title">Widget betiğini kopyala</div><div class="row-sub">Scriptable'da “Subby” adlı betik oluşturup yapıştır</div></div></button>
+      <button class="row" data-action="widget-update"><div class="logo sm" style="background:#bf5af2">3</div><div class="row-main"><div class="row-title">Widget'ı güncelle</div><div class="row-sub">${state.settings.widgetHash ? (state.settings.widgetHash === widgetHash() ? "Widget güncel ✓" : "Değişiklikler var — güncelle") : "Abonelikleri widget'a gönder"}</div></div></button>
+    </div>
+    <div class="section-foot">Sonra ana ekrana uzun bas → <b>+</b> → Scriptable → boyut seç → widget'a uzun bas → Widget'ı düzenle → Script: <b>Subby</b>. Abonelik ekleyip sildikçe 3. adımı tekrarla. Kilit ekranı widget'ı da desteklenir.</div>
 
     <div class="section-title"><span>Yedekleme</span></div>
     <div class="card">
@@ -736,6 +796,8 @@ document.addEventListener("click", (e) => {
     case "detect": return openSheet(() => showDetect());
     case "hide-tip": state.settings.installTipHidden = true; save(); return render();
     case "rates": return updateRates();
+    case "widget-update": return updateWidget();
+    case "widget-copy": return copyWidgetScript();
     case "ics-all": return shareICS(state.subs, "subby-abonelikler.ics");
     case "export":
       return shareFile(JSON.stringify({ app: "subby", version: 1, exportedAt: new Date().toISOString(), ...state }, null, 2),

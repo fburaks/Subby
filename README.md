@@ -22,6 +22,17 @@ iPhone'da ana ekrana eklenip uygulama gibi çalışan (PWA) abonelik takip uygul
 3. **Paylaş** (⎙) → **Ana Ekrana Ekle**.
 4. Ana ekrandaki Subby ikonuyla tam ekran uygulama olarak aç.
 
+## Ana ekran widget'ı (Scriptable)
+
+iOS web uygulamalarına widget izni vermediği için widget, ücretsiz [Scriptable](https://apps.apple.com/app/scriptable/id1405459188) uygulamasıyla çalışır.
+
+1. Scriptable'ı App Store'dan yükle.
+2. Subby → Ayarlar → **Widget betiğini kopyala**. Scriptable'da **+** ile yeni betik aç, adını **Subby** yap, yapıştır.
+3. Subby → Ayarlar → **Widget'ı güncelle**. Scriptable açılır ve aboneliklerini kaydeder.
+4. Ana ekrana uzun bas → **+** → Scriptable → boyut seç → widget'a uzun bas → **Widget'ı düzenle** → Script: **Subby**.
+
+Widget aylık toplamı, 30 günlük ödemeleri, yaklaşan ödemeleri ve biten deneme sürelerini gösterir; ödeme tarihlerini kendisi hesapladığı için günler geçtikçe güncel kalır. Küçük, orta, büyük ve kilit ekranı boyutları desteklenir. Abonelik ekleyip silince 3. adımı tekrarla (Subby ana ekranında hatırlatma çıkar). Betik: `widget/subby-widget.js`.
+
 ## Yayınlama
 
 ### GitHub Pages (önerilen)
@@ -48,6 +59,7 @@ python3 -m http.server 8000
 | `js/detect.js` | SMS / ekstre metninden abonelik tanıma |
 | `js/dates.js` | Yenilenme tarihi hesapları |
 | `js/ics.js` | Takvim (.ics) dışa aktarma |
+| `widget/subby-widget.js` | Scriptable ana ekran / kilit ekranı widget'ı |
 | `sw.js` | Çevrimdışı önbellek (dosya değişince `VERSION`'ı artır) |
 
 Katalogdaki fiyatlar yaklaşıktır; ekleme sırasında düzenlenebilir. Yeni servis eklemek için `js/catalog.js`'e bir satır eklemen yeterli.

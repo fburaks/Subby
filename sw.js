@@ -1,8 +1,8 @@
 // Çevrimdışı çalışma için basit önbellek. Dosyaları değiştirince VERSION'ı artır.
-const VERSION = "subby-v1";
+const VERSION = "subby-v2";
 const ASSETS = [
   "./", "index.html", "manifest.webmanifest", "css/style.css",
-  "js/app.js", "js/catalog.js", "js/dates.js", "js/detect.js", "js/ics.js",
+  "js/app.js", "js/catalog.js", "js/dates.js", "js/detect.js", "js/ics.js", "widget/subby-widget.js",
   "icons/icon.svg", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png",
 ];
 
