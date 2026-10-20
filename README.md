@@ -48,6 +48,10 @@ python3 -m http.server 8000
 # http://localhost:8000
 ```
 
+## Menkul Vergi
+
+`vergi/` klasöründe eurobond kupon ve satış kazancı vergisi hesaplayıcısı var (`/vergi/` adresinde açılır). Ayrıntılar: [`vergi/README.md`](vergi/README.md).
+
 ## Yapı
 
 | Dosya | Açıklama |

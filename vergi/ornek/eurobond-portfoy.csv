@@ -1,0 +1,3 @@
+isin;ad;ihracci;para;nominal;kupon;siklik;vade;alis_tarihi;alis_fiyati;alis_kuru;alis_islemis_faiz;guncel_fiyat;stopaj;yurtdisi_vergi;gun_sayimi
+XS0000000001;TURKEY 7.625 2029;TR_HAZINE;USD;50000;7,625;2;2029-04-26;2024-03-15;101,25;32,10;;103,40;0;0;30/360
+XS0000000002;TURKEY 5.875 2030;TR_HAZINE;EUR;20000;5,875;1;2030-05-21;2025-01-10;99,10;36,85;;101,20;0;0;ACT/ACT
