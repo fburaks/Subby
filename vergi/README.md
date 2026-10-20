@@ -11,7 +11,9 @@ Türkiye'de tam mükellef gerçek kişiler için eurobond kupon ve satış kazan
 
 ## Portföy formatı
 
-İlk satır başlık; ayraç `;`, `,` veya sekme. Ondalıklarda virgül ya da nokta kullanılabilir. Her satır bir alım (lot). Örnek: `ornek/eurobond-portfoy.csv`.
+Portföy uygulamasının JSON yedeği (`{ surum, veri: { "portfoy-varliklar", "portfoy-varlik-islemleri", … } }`) de doğrudan yüklenebilir: eurobondlar alınır, alış tarihleri alım/satım işlemlerinden FIFO ile bulunur, `Döviz__USD` gibi kur geçmişleri kur tablosuna eklenir. Yedekteki adet, seçilen birim nominalle (varsayılan 1 adet = 100) çarpılır.
+
+CSV için ilk satır başlık; ayraç `;`, `,` veya sekme. Ondalıklarda virgül ya da nokta kullanılabilir. Her satır bir alım (lot). Örnek: `ornek/eurobond-portfoy.csv`.
 
 | Sütun | Zorunlu | Açıklama |
 | --- | --- | --- |

@@ -8,6 +8,7 @@ import { parseNum, fmtTL, fmtNum, fmtCcy, fmtPct } from "./core/num.js";
 import { todayISO, fmtDate, yearOf, prevMonth, normDate } from "./core/dates.js";
 import { emptyMarket, getFx, setFx, importFxText, importUfeText, fetchEcbRates, fetchEcbLatest } from "./core/market.js";
 import { couponsAfterPurchase } from "./instruments/eurobond.js";
+import { isPortfoyYedek, fromPortfoyYedek } from "./importers/portfoyYedek.js";
 
 const KEY = "menkul-vergi.v1";
 const $ = (s, el = document) => el.querySelector(s);
@@ -20,7 +21,7 @@ const defaultState = () => ({
   instrument: "eurobond",
   holdings: [],
   market: emptyMarket(),
-  settings: { itfaIskonto: "msi", islemisFaizBedele: true, endekslemeEsik: 0.10 },
+  settings: { itfaIskonto: "msi", islemisFaizBedele: true, endekslemeEsik: 0.10, unitNominal: 100 },
   taxOpts: { otherMatrahTL: 0, otherTevkifatliTL: 0, otherTevkifatsizTL: 0 },
   year: yearOf(todayISO()),
   sale: { date: todayISO(), fx: {}, sel: {}, price: {} },
@@ -29,12 +30,28 @@ const defaultState = () => ({
 
 let state;
 
-function load() {
+function stored() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...defaultState(), ...JSON.parse(raw) };
+    if (raw) return JSON.parse(raw);
   } catch { /* depolama kapalı olabilir */ }
-  return sampleState();
+  return null;
+}
+
+const withDefaults = (s) => {
+  const d = defaultState();
+  return { ...d, ...s, settings: { ...d.settings, ...s.settings }, market: { ...d.market, ...s.market } };
+};
+
+// Kayıtlı (örnek olmayan) durum yoksa yanında yayınlanan seed.json (varsa), o da yoksa örnek portföy.
+async function load() {
+  const s = stored();
+  if (s && !s.sample) return withDefaults(s);
+  try {
+    const res = await fetch("seed.json", { cache: "no-store" });
+    if (res.ok) return withDefaults(await res.json());
+  } catch { /* seed yok */ }
+  return s ? withDefaults(s) : sampleState();
 }
 
 function save() {
@@ -348,6 +365,9 @@ function viewPortfolio() {
   <section class="panel">
     <h2>Portföy yükle</h2>
     <p class="small muted">Her satır bir alım (lot). Aynı ISIN'i farklı tarihlerde aldıysan ayrı satır yaz. Ayraç <code>;</code>, <code>,</code> ya da sekme olabilir; Excel'den kopyala-yapıştır da olur. Ondalık için virgül ya da nokta kullanabilirsin.</p>
+    <p class="small muted">Portföy uygulamasının JSON yedeğini de doğrudan yükleyebilirsin: eurobondlar, alış tarihleri (alım işlemlerinden) ve kur geçmişi alınır.</p>
+    <label class="f" style="max-width:340px">Yedekte 1 adet eurobond =
+      <select id="set-unit" data-set="unitNominal">${[100, 1000].map((n) => `<option value="${n}" ${state.settings.unitNominal === n ? "selected" : ""}>${fmtNum(n, 0)} nominal</option>`).join("")}</select></label>
     <textarea id="imp-text" spellcheck="false" placeholder="${esc(inst.csvTemplate)}"></textarea>
     <div class="btns">
       <button class="btn" data-act="import" data-mode="replace">Yükle (mevcutların yerine)</button>
@@ -367,25 +387,36 @@ function viewPortfolio() {
 function doImport(text, mode) {
   text = text.trim();
   if (!text) return toast("Önce portföy metnini yapıştır.");
-  let rows;
+  let rows, extraErrors = [], fx = null;
   try {
-    rows = text.startsWith("[") || text.startsWith("{") ? [].concat(JSON.parse(text)) : parseCSV(text);
+    const json = text.startsWith("[") || text.startsWith("{") ? JSON.parse(text) : null;
+    if (isPortfoyYedek(json)) {
+      const r = fromPortfoyYedek(json, { unitNominal: state.settings.unitNominal });
+      rows = r.rows; extraErrors = r.errors; fx = r.fx;
+    } else rows = json ? [].concat(json) : parseCSV(text);
   } catch (e) {
     return showImportMsg([`Okunamadı: ${e.message}`]);
   }
   // JSON yedeği (tam durum) ise geri yükle.
   if (rows.length === 1 && rows[0].holdings && rows[0].market) {
-    state = { ...defaultState(), ...rows[0], tab: "portfoy" };
+    state = { ...withDefaults(rows[0]), tab: "portfoy" };
     save(); render();
     return toast("Yedek geri yüklendi.");
   }
-  const { holdings, errors } = importRows(rows, state.instrument);
+  const { holdings, errors: rowErrors } = importRows(rows, state.instrument);
+  const errors = [...extraErrors, ...rowErrors];
   if (!holdings.length) return showImportMsg(errors.length ? errors : ["Satır bulunamadı. İlk satır sütun başlıkları olmalı."]);
   if (state.sample) { state.holdings = []; state.market.fxCurrent = {}; state.sample = false; }
   state.holdings = mode === "append" ? [...state.holdings, ...holdings] : [...state.holdings.filter((h) => h.instrument !== state.instrument), ...holdings];
   state.sale = defaultState().sale;
+  let fxCount = 0;
+  for (const [c, table] of Object.entries(fx || {})) {
+    for (const [d, r] of Object.entries(table)) { setFx(state.market, c, d, r); fxCount++; }
+    const last = Object.keys(table).sort().pop();
+    if (last) state.market.fxCurrent[c] = table[last];
+  }
   save(); render();
-  showImportMsg(errors, `${holdings.length} pozisyon yüklendi.`);
+  showImportMsg(errors, `${holdings.length} pozisyon yüklendi.${fxCount ? ` Yedekten ${fxCount} günlük kur eklendi.` : ""}`);
 }
 
 function showImportMsg(errors, ok) {
@@ -578,7 +609,7 @@ document.addEventListener("change", (e) => {
   else if (d.price) state.sale.price[d.price] = parseNum(t.value);
   else if (d.cur) { state.market.fxCurrent[d.cur] = parseNum(t.value); state.sale.fx = {}; }
   else if (d.fx) { const [c, dt] = d.fx.split("|"); const v = parseNum(t.value); if (v) setFx(state.market, c, dt, v); }
-  else if (d.set) state.settings[d.set] = t.type === "checkbox" ? t.checked : t.value;
+  else if (d.set) state.settings[d.set] = t.type === "checkbox" ? t.checked : d.set === "unitNominal" ? Number(t.value) : t.value;
   else if (t.id === "imp-file") {
     const f = t.files[0];
     if (f) f.text().then((txt) => { $("#imp-text").value = txt; doImport(txt, "replace"); });
@@ -588,5 +619,4 @@ document.addEventListener("change", (e) => {
   render();
 });
 
-state = load();
-render();
+load().then((s) => { state = s; render(); });

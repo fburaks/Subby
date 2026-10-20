@@ -65,3 +65,25 @@ test("satış: endeksleme %10 eşiği", () => {
   assert.equal(d2.indexed, false);
   assert.equal(d2.gainTL, d2.proceedsTL - d2.costTL);
 });
+
+import { fromPortfoyYedek } from "../js/importers/portfoyYedek.js";
+
+test("portföy yedeği: FIFO lotlar ve kur geçmişi", () => {
+  const backup = { veri: {
+    "portfoy-varliklar": [{ kategori: "Eurobond", ad: "US900123XX11", adet: 15, guncelFiyat: 101, paraBirimi: "USD", kuponOrani: 6.5, kuponSikligi: 2, vadeTarihi: "2035-01-03", hesap: "Banka" }],
+    "portfoy-varlik-islemleri": [
+      { kategori: "Eurobond", ad: "US900123XX11", tur: "alim", tarih: "2024-01-10T00:00:00.000Z", adet: 10, fiyat: 95 },
+      { kategori: "Eurobond", ad: "US900123XX11", tur: "alim", tarih: "2025-02-10T00:00:00.000Z", adet: 10, fiyat: 98 },
+      { kategori: "Eurobond", ad: "US900123XX11", tur: "satim", tarih: "2025-06-01T00:00:00.000Z", adet: 5, fiyat: 99 },
+    ],
+    "portfoy-varlik-fiyat-gecmisi": { "Döviz__USD": [{ tarih: "2026-07-24", fiyat: 47.3 }] },
+  } };
+  const r = fromPortfoyYedek(backup, { unitNominal: 100 });
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.rows.length, 2);
+  assert.equal(r.rows[0].nominal, 500);
+  assert.equal(r.rows[0].alis_tarihi, "2024-01-10");
+  assert.equal(r.rows[1].nominal, 1000);
+  assert.equal(r.rows[0].ihracci, "TR_HAZINE");
+  assert.equal(r.fx.USD["2026-07-24"], 47.3);
+});
