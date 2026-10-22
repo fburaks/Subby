@@ -42,8 +42,8 @@ Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yenide
 ## Görselleştirme
 - **Şekil** = tekil proses: daire (yok), kare (CS), üçgen (DONLY), eşkenar dörtgen (DNOCLAMP),
   yıldız (birden fazla — hata), halka (MPF'de yok).
-- **Renk** = seçilebilir mod: durum (PSEN sayısı / kural ihlali), proses kombinasyonu,
-  FPDF proses kodu, Z yüksekliği.
+- **Renk** = varsayılan olarak bağlayıcı tipi; ayrıca durum (PSEN sayısı / kural ihlali),
+  proses kombinasyonu, FPDF proses kodu, Z yüksekliği seçilebilir.
 - Lejanttaki kutucuklarla kategoriler gizlenip gösterilebilir.
 - Noktaya tıklayınca sağda detay paneli (MPF satır numaraları ve satır içerikleri), çift tıklayınca odaklanma.
 - Arama kutusu: eşleşen noktalar vurgulanır, Enter ile ilk sonuca gidilir.
