@@ -15,7 +15,7 @@ Kullanım:
     python proses3d_catia.py --sembol-testi             -> CATIA sembol numaralarını gösteren test noktaları
 
 Yapı: "Proses3D_<başlık>" adlı bir geometrik set ve içinde her kategori için bir alt set oluşturulur.
-Nokta adları: <nokta adı>-<bağlayıcı tipi>-<proses>
+Nokta adları: <nokta adı>,<bağlayıcı tipi>,<proses>
 """
 import csv
 import sys

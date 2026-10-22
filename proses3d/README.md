@@ -52,7 +52,7 @@ Harita lejantının üstündeki düğmelerle (veya *Gösterim → Harita modu*) 
 | Mod | Renk | Şekil |
 |---|---|---|
 | **Tip** | Bağlayıcı tipi | Hepsi daire |
-| **Proses** | PSEN (yalnızca PSEN olanlar); CS / DONLY / DNOCLAMP (yanında PSEN olsa da o tekil proses sayılır); proses yok; Çoklu proses (hatalı) | Tekil proses |
+| **Proses** | Tekil proses: CS / DONLY / DNOCLAMP (yanında PSEN olsa da o sayılır); Tekil proses yok (yalnızca PSEN olanlar ve prosesi olmayanlar); Çoklu proses (hatalı) | Tekil proses |
 | **Tip + Proses** (varsayılan) | Bağlayıcı tipi | Tekil proses |
 | **PSEN** | PSEN var: yeşil büyük yıldız; diğer her şey: küçük gri daire | — |
 
@@ -92,7 +92,8 @@ CGR kapalı bir format olduğu için doğrudan okunamaz. CATIA'dan:
    python proses3d_catia.py Panel_A_harita_catia.csv --yeni   (yeni Part'a)
    ```
 4. Sonuç: `Proses3D_<başlık>` geometrik seti, içinde her renk/sembol grubu için bir alt set.
-   Nokta adları `<nokta adı>-<bağlayıcı tipi>-<proses>` (ör. `Point_No--Fst-1962-P20-CS`).
+   Nokta adları `<nokta adı>,<bağlayıcı tipi>,<proses>` (ör. `Point_No--Fst-1962,P20,CS`); bağlayıcı
+   isimlerinde tire olabildiği için ayraç virgüldür.
    Proses değerleri: PSEN, CS, DONLY, DNOCLAMP, PROSESYOK, COKLU, MPFYOK.
 
 CATIA'nın sembol numaraları (SetSymbolType) sürüme göre farklı olabilir:
