@@ -1125,6 +1125,7 @@
     }
     return {
       app: 'proses3d', v: 1, created: new Date().toISOString(),
+      viewerOnly: $('shareViewer').checked,
       names: state.names, fpdf: state.text.fpdf, mpf: state.text.mpf,
       settings: state.settings, inputs: inputs,
       hiddenShapes: state.hiddenShapes, hiddenColors: state.hiddenColors,
@@ -1148,6 +1149,12 @@
 
   function applyShare(d) {
     state.shared = d;
+    if (d.viewerOnly) {
+      // Yalnızca 3D görünüm ve lejant; düzenleme paneli gizlenir
+      document.body.classList.add('viewer');
+      if (d.inputs) d.inputs.chkSummary = true;
+      resize();
+    }
     state.settings = Proses.mergeSettings(d.settings);
     settingsToForm();
     var inputs = d.inputs || {};

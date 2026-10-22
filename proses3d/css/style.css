@@ -129,6 +129,13 @@ code { background: var(--panel-2); padding: 0 4px; border-radius: 3px; }
 #drawerBody td.bad { color: var(--warn); }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 
+/* Paylaşılan harita: yalnızca 3D görünüm ve lejant */
+body.viewer #sidebar, body.viewer #stats, body.viewer #search, body.viewer #btnTable,
+body.viewer #btnWarn, body.viewer #drawer, body.viewer #empty { display: none !important; }
+body.viewer #toolbar { left: auto; justify-content: flex-end; }
+body.viewer #summary { top: 10px; max-height: calc(100% - 20px); }
+body.viewer #info { top: 52px; }
+
 @media (max-width: 760px) {
   #app { flex-direction: column; }
   #sidebar { width: auto; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--line); }

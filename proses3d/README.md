@@ -63,8 +63,9 @@ CGR kapalı bir format olduğu için doğrudan okunamaz. CATIA'dan:
 *Kaydet / Paylaş* bölümünden:
 - **Haritayı kaydet (HTML)**: FPDF/MPF verisi, ayarlar, filtreler, kamera açısı, başlık ve
   (isteğe bağlı) 3D model tek bir HTML dosyasına gömülür. Alıcı dosyayı çift tıklayarak açar ve
-  haritayı aynı görünümde, tam etkileşimli olarak inceler. Bu özellik yalnızca `Proses3D.html`
-  sürümünde çalışır.
+  haritayı aynı görünümde inceler. *Sadece 3D görünüm ve lejant* seçiliyse (varsayılan) alıcı
+  yalnızca 3D pencereyi, özet lejantını ve görünüm düğmelerini görür; düzenleme paneli gizlenir.
+  Bu özellik yalnızca `Proses3D.html` sürümünde çalışır.
 - **Görüntü (PNG)**: o anki görünüm + özet lejantı.
 - **CSV**: nokta listesi ve uyarılar.
 

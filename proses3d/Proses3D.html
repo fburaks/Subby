@@ -136,6 +136,13 @@ code { background: var(--panel-2); padding: 0 4px; border-radius: 3px; }
 #drawerBody td.bad { color: var(--warn); }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 
+/* Paylaşılan harita: yalnızca 3D görünüm ve lejant */
+body.viewer #sidebar, body.viewer #stats, body.viewer #search, body.viewer #btnTable,
+body.viewer #btnWarn, body.viewer #drawer, body.viewer #empty { display: none !important; }
+body.viewer #toolbar { left: auto; justify-content: flex-end; }
+body.viewer #summary { top: 10px; max-height: calc(100% - 20px); }
+body.viewer #info { top: 52px; }
+
 @media (max-width: 760px) {
   #app { flex-direction: column; }
   #sidebar { width: auto; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--line); }
@@ -254,7 +261,8 @@ code { background: var(--panel-2); padding: 0 4px; border-radius: 3px; }
 
     <details>
       <summary>Kaydet / Paylaş</summary>
-      <p class="hint">Paylaşım dosyası tek bir HTML'dir: veriler, ayarlar, görünüm ve model içine gömülür. Alıcı çift tıklayarak açar, başka bir şey gerekmez.</p>
+      <p class="hint">Paylaşım dosyası tek bir HTML'dir: veriler, görünüm ve model içine gömülür. Alıcı çift tıklayarak açar, başka bir şey gerekmez.</p>
+      <div class="row"><label><input id="shareViewer" type="checkbox" checked> Sadece 3D görünüm ve lejant</label></div>
       <div class="row"><label><input id="shareModel" type="checkbox" checked> 3D modeli dahil et</label></div>
       <div class="row"><button id="btnShare" class="btn primary">Haritayı kaydet (HTML)</button></div>
       <div class="row"><button id="btnPng" class="btn">Görüntü (PNG)</button></div>
@@ -11618,6 +11626,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\n$ PRO
     }
     return {
       app: 'proses3d', v: 1, created: new Date().toISOString(),
+      viewerOnly: $('shareViewer').checked,
       names: state.names, fpdf: state.text.fpdf, mpf: state.text.mpf,
       settings: state.settings, inputs: inputs,
       hiddenShapes: state.hiddenShapes, hiddenColors: state.hiddenColors,
@@ -11641,6 +11650,12 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\n$ PRO
 
   function applyShare(d) {
     state.shared = d;
+    if (d.viewerOnly) {
+      // Yalnızca 3D görünüm ve lejant; düzenleme paneli gizlenir
+      document.body.classList.add('viewer');
+      if (d.inputs) d.inputs.chkSummary = true;
+      resize();
+    }
     state.settings = Proses.mergeSettings(d.settings);
     settingsToForm();
     var inputs = d.inputs || {};
