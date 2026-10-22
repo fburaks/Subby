@@ -2,15 +2,16 @@
 
 FPDF dosyasındaki bağlayıcı noktalarından 3D nokta bulutu oluşturur, MPF (makine programı)
 dosyasındaki prosesleri bağlayıcı ismi üzerinden bu noktalarla eşleştirir ve isteğe bağlı bir
-3D model (STL / OBJ / PLY / GLB) ile birlikte gösterir.
+3D model (STL / VRML / OBJ / PLY / GLB) ile birlikte gösterir.
 
 ## Çalıştırma (Windows)
 
-Ek yazılım gerekmez. `proses3d` klasörünü bilgisayara kopyalayın ve **`index.html`** dosyasına
-çift tıklayın (Chrome veya Edge önerilir). İnternet bağlantısı gerekmez; Three.js kütüphanesi
-`lib/` klasöründe yer alır.
+Ek yazılım gerekmez. **`Proses3D.html`** dosyasını bilgisayara kopyalayıp çift tıklayın
+(Chrome veya Edge önerilir). Tüm kütüphaneler dosyanın içine gömülüdür; internet bağlantısı
+ya da başka bir dosya gerekmez.
 
-Klasörün tamamı birlikte taşınmalıdır (`index.html`, `css/`, `js/`, `lib/`, `ornek/`).
+`index.html` geliştirme sürümüdür (kaynakları `css/`, `js/`, `lib/` klasörlerinden okur).
+Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yeniden üretilir.
 
 ## Dosya kuralları
 
@@ -48,6 +49,24 @@ Klasörün tamamı birlikte taşınmalıdır (`index.html`, `css/`, `js/`, `lib/
 - Arama kutusu: eşleşen noktalar vurgulanır, Enter ile ilk sonuca gidilir.
 - *Tablo* ve *Uyarılar* panelleri, CSV dışa aktarma (Excel için `;` ayraçlı).
 - 3D model: renk, opaklık, tel kafes, öteleme / dönme / ölçek ile noktalara hizalama.
+- **Özet lejantı** (harita üzerinde): harita başlığı, toplam bağlayıcı, PSEN olan nokta ve toplam
+  PSEN işlemi, bağlayıcı tiplerine göre sayılar, tekil proses sayıları ve kontrol sayıları.
+  Bağlayıcı tipi varsayılan olarak FPDF proses kodu sütunudur; *FPDF sütunları* bölümünden
+  ayrı bir sütun seçilebilir.
+
+## 3D model (CATIA)
+CGR kapalı bir format olduğu için doğrudan okunamaz. CATIA'dan:
+- **CATPart → STL** (Save As → stl)
+- **CATProduct → VRML** (Save As → wrl, VRML 97 / V2.0)
+
+## Kaydetme ve paylaşma
+*Kaydet / Paylaş* bölümünden:
+- **Haritayı kaydet (HTML)**: FPDF/MPF verisi, ayarlar, filtreler, kamera açısı, başlık ve
+  (isteğe bağlı) 3D model tek bir HTML dosyasına gömülür. Alıcı dosyayı çift tıklayarak açar ve
+  haritayı aynı görünümde, tam etkileşimli olarak inceler. Bu özellik yalnızca `Proses3D.html`
+  sürümünde çalışır.
+- **Görüntü (PNG)**: o anki görünüm + özet lejantı.
+- **CSV**: nokta listesi ve uyarılar.
 
 Fare: sol tuş döndür, sağ tuş kaydır, tekerlek yakınlaştır.
 
@@ -59,4 +78,5 @@ düğmesi bunların `ornek-data.js` içine gömülü kopyasını kullanır.
 - `js/parser.js` — FPDF/MPF ayrıştırma ve eşleştirme (tarayıcı ve Node uyumlu)
 - `js/app.js` — arayüz ve Three.js sahnesi
 - Ayrıştırıcı testleri: `node proses3d/test/parser.test.js`
-- Three.js r147 (MIT lisansı, `lib/three-LICENSE.txt`)
+- `build.js` — tek dosyalık `Proses3D.html` üretir
+- Three.js r147 (MIT lisansı, `lib/three-LICENSE.txt`), chevrotain 9 (Apache-2.0, VRML ayrıştırma için)

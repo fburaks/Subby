@@ -26,7 +26,7 @@
         <span id="lblMpf" class="fname">—</span>
       </div>
       <div class="filerow">
-        <label class="btn file">3D model<input type="file" id="inModel" accept=".stl,.obj,.ply,.glb,.gltf"></label>
+        <label class="btn file">3D model<input type="file" id="inModel" accept=".stl,.wrl,.vrml,.obj,.ply,.glb"></label>
         <span id="lblModel" class="fname">—</span>
       </div>
       <div class="row">
@@ -37,12 +37,12 @@
           <option value="windows-1252">Windows-1252</option>
         </select>
       </div>
-      <p class="hint">Dosyaları pencereye sürükleyip bırakabilirsiniz. Desteklenen modeller: STL, OBJ, PLY, GLB.</p>
+      <p class="hint">Dosyaları pencereye sürükleyip bırakabilirsiniz. Desteklenen modeller: STL, VRML (.wrl), OBJ, PLY, GLB. CATIA: CATPart → STL, CATProduct → VRML olarak kaydedin.</p>
     </details>
 
     <details>
       <summary>FPDF sütunları</summary>
-      <p class="hint">Sütun numaraları 1'den başlar. <code>$</code> ile başlayan satırlar yorum kabul edilir.</p>
+      <p class="hint">Sütun numaraları 1'den başlar. Bağlayıcı tipi için 0 girilirse proses kodu sütunu kullanılır. <code>$</code> ile başlayan satırlar yorum kabul edilir.</p>
       <div class="grid2">
         <label>Ayraç</label><input id="cfgDelim" type="text" value=",">
         <label>Proses kodu</label><input id="cfgProc" type="number" min="1">
@@ -50,6 +50,7 @@
         <label>X</label><input id="cfgX" type="number" min="1">
         <label>Y</label><input id="cfgY" type="number" min="1">
         <label>Z</label><input id="cfgZ" type="number" min="1">
+        <label>Bağlayıcı tipi</label><input id="cfgType" type="number" min="0" title="0 = proses kodu sütunu kullanılır">
       </div>
       <div id="fpdfPreview" class="preview"></div>
     </details>
@@ -80,11 +81,14 @@
         <select id="colorMode">
           <option value="status">Durum (PSEN sayısı)</option>
           <option value="combo">Proses kombinasyonu</option>
+          <option value="type">Bağlayıcı tipi</option>
           <option value="fpdf">FPDF proses kodu</option>
           <option value="z">Z yüksekliği</option>
         </select>
       </div>
+      <div class="row"><label>Harita başlığı</label><input id="mapTitle" type="text" placeholder="ör. Panel A - Hat 2"></div>
       <div class="row"><label>Nokta boyutu</label><input id="ptSize" type="range" min="4" max="40" value="14"><span id="ptSizeVal">14</span></div>
+      <div class="row"><label><input id="chkSummary" type="checkbox" checked> Özet lejantı (harita üzerinde)</label></div>
       <div class="row"><label><input id="chkLabels" type="checkbox"> Seçili isim etiketi</label></div>
       <div class="row"><label><input id="chkAxes" type="checkbox" checked> Eksen / ızgara</label></div>
       <div class="row"><label><input id="chkOnTop" type="checkbox"> Noktalar model önünde</label></div>
@@ -111,7 +115,11 @@
     </details>
 
     <details>
-      <summary>Dışa aktar</summary>
+      <summary>Kaydet / Paylaş</summary>
+      <p class="hint">Paylaşım dosyası tek bir HTML'dir: veriler, ayarlar, görünüm ve model içine gömülür. Alıcı çift tıklayarak açar, başka bir şey gerekmez.</p>
+      <div class="row"><label><input id="shareModel" type="checkbox" checked> 3D modeli dahil et</label></div>
+      <div class="row"><button id="btnShare" class="btn primary">Haritayı kaydet (HTML)</button></div>
+      <div class="row"><button id="btnPng" class="btn">Görüntü (PNG)</button></div>
       <div class="row"><button id="btnCsv" class="btn">Nokta listesi (CSV)</button></div>
       <div class="row"><button id="btnWarnCsv" class="btn">Uyarılar (CSV)</button></div>
     </details>
@@ -136,6 +144,7 @@
       <button class="btn" id="btnWarn">Uyarılar <span id="warnCount" class="badge">0</span></button>
     </div>
     <div id="stats"></div>
+    <section id="summary" hidden></section>
     <div id="tooltip" hidden></div>
     <div id="label3d" hidden></div>
     <div id="dropHint" hidden>Dosyaları buraya bırakın</div>
@@ -170,6 +179,8 @@
 <script src="lib/OBJLoader.js"></script>
 <script src="lib/PLYLoader.js"></script>
 <script src="lib/GLTFLoader.js"></script>
+<script src="lib/chevrotain.min.js"></script>
+<script src="lib/VRMLLoader.js"></script>
 <script src="js/parser.js"></script>
 <script src="ornek/ornek-data.js"></script>
 <script src="js/app.js"></script>

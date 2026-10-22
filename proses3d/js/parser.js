@@ -17,7 +17,9 @@
       nameCol: 2,
       xCol: 3,
       yCol: 4,
-      zCol: 5
+      zCol: 5,
+      // Bağlayıcı tipi sütunu; 0 = proses kodu sütununu kullan
+      typeCol: 0
     },
     mpf: {
       commentPrefix: '$',
@@ -93,9 +95,10 @@
     var commentCount = 0, emptyCount = 0;
     var cols = {
       proc: (+cfg.procCol) - 1, name: (+cfg.nameCol) - 1,
-      x: (+cfg.xCol) - 1, y: (+cfg.yCol) - 1, z: (+cfg.zCol) - 1
+      x: (+cfg.xCol) - 1, y: (+cfg.yCol) - 1, z: (+cfg.zCol) - 1,
+      type: (+cfg.typeCol || 0) - 1
     };
-    var maxCol = Math.max(cols.proc, cols.name, cols.x, cols.y, cols.z);
+    var maxCol = Math.max(cols.proc, cols.name, cols.x, cols.y, cols.z, cols.type);
 
     for (var i = 0; i < lines.length; i++) {
       var raw = lines[i];
@@ -122,6 +125,7 @@
         id: points.length,
         name: name,
         fpdfProc: fields[cols.proc],
+        type: cols.type >= 0 ? fields[cols.type] : fields[cols.proc],
         x: x, y: y, z: z,
         line: lineNo,
         fields: fields

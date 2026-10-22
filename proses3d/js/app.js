@@ -5,6 +5,16 @@
   var $ = function (id) { return document.getElementById(id); };
   var STORE_KEY = 'proses3d.settings.v1';
 
+  // Paylaşım dosyası için sayfanın kendisi şablon olarak saklanır. Bu yalnızca tüm kaynakların
+  // gömülü olduğu tek dosyalık Proses3D.html sürümünde mümkündür.
+  var TEMPLATE = (function () {
+    if (document.querySelector('script[src], link[rel=stylesheet]')) return null;
+    var root = document.documentElement.cloneNode(true);
+    var old = root.querySelector('#paylasimVeri');
+    if (old) old.remove();
+    return '<!doctype html>\n' + root.outerHTML;
+  })();
+
   // ------------------------------------------------------------------ durum
   var state = {
     settings: loadSettings(),
@@ -125,8 +135,10 @@
     if (mode === 'status') {
       keyOf = statusKey;
       cats = STATUS.map(function (s) { return { key: s.key, label: s.label, color: s.color }; });
-    } else if (mode === 'combo' || mode === 'fpdf') {
-      keyOf = mode === 'combo' ? function (p) { return p.combo; } : function (p) { return p.fpdfProc || '(boş)'; };
+    } else if (mode === 'combo' || mode === 'fpdf' || mode === 'type') {
+      keyOf = mode === 'combo' ? function (p) { return p.combo; }
+        : mode === 'type' ? function (p) { return p.type || '(boş)'; }
+        : function (p) { return p.fpdfProc || '(boş)'; };
       var seen = {};
       pts.forEach(function (p) { var k = keyOf(p); seen[k] = (seen[k] || 0) + 1; });
       Object.keys(seen).sort(naturalCmp).forEach(function (k, i) {
@@ -387,6 +399,7 @@
     updateStats();
     updatePreview();
     showInfo(state.selected);
+    renderSummary();
     if (state.drawerMode) renderDrawer();
     var wc = state.warnings.length;
     $('warnCount').textContent = wc;
@@ -493,6 +506,7 @@
     var html = '<h3>' + esc(p.name || '(isimsiz)') + '</h3>' +
       '<table class="kv">' +
       '<tr><td>FPDF proses</td><td>' + esc(p.fpdfProc) + '</td></tr>' +
+      '<tr><td>Bağlayıcı tipi</td><td>' + esc(p.type) + '</td></tr>' +
       '<tr><td>X / Y / Z</td><td>' + fmt(p.x) + ' / ' + fmt(p.y) + ' / ' + fmt(p.z) + '</td></tr>' +
       '<tr><td>FPDF satırı</td><td>' + p.line + '</td></tr>' +
       '<tr><td>MPF pozisyon</td><td>' + p.positionCount + ' kez</td></tr>' +
@@ -593,6 +607,7 @@
   // ------------------------------------------------------------------ alt panel
   var COLS = [
     { key: 'name', label: 'Bağlayıcı' },
+    { key: 'type', label: 'Tip' },
     { key: 'fpdfProc', label: 'FPDF proses' },
     { key: 'x', label: 'X', num: true }, { key: 'y', label: 'Y', num: true }, { key: 'z', label: 'Z', num: true },
     { key: 'psenCount', label: 'PSEN', num: true },
@@ -734,6 +749,7 @@
   var FORM = [
     ['cfgDelim', 'fpdf', 'delimiter'], ['cfgProc', 'fpdf', 'procCol', true], ['cfgName', 'fpdf', 'nameCol', true],
     ['cfgX', 'fpdf', 'xCol', true], ['cfgY', 'fpdf', 'yCol', true], ['cfgZ', 'fpdf', 'zCol', true],
+    ['cfgType', 'fpdf', 'typeCol', 'zero'],
     ['cfgPos', 'mpf', 'positionKeywords'], ['cfgProcKw', 'mpf', 'processKeywords'],
     ['cfgExcl', 'mpf', 'exclusiveKeywords'], ['cfgRep', 'mpf', 'repeatableKeyword'], ['cfgNameSrc', 'mpf', 'nameSource']
   ];
@@ -744,7 +760,7 @@
   function formToSettings() {
     FORM.forEach(function (f) {
       var v = $(f[0]).value;
-      if (f[3]) { v = parseInt(v, 10); if (!(v >= 1)) return; }
+      if (f[3]) { v = parseInt(v, 10); if (!(v >= (f[3] === 'zero' ? 0 : 1))) return; }
       state.settings[f[1]][f[2]] = v;
     });
     state.settings.matchCaseInsensitive = $('cfgCI').checked;
@@ -754,7 +770,7 @@
   $('btnApply').onclick = function () { formToSettings(); state.hiddenShapes = {}; process(); };
   $('btnReset').onclick = function () { state.settings = Proses.mergeSettings(); settingsToForm(); saveSettings(); process(); };
   // Sütun numaraları değiştikçe önizlemeyi güncelle
-  ['cfgDelim', 'cfgProc', 'cfgName', 'cfgX', 'cfgY', 'cfgZ'].forEach(function (id) {
+  ['cfgDelim', 'cfgProc', 'cfgName', 'cfgX', 'cfgY', 'cfgZ', 'cfgType'].forEach(function (id) {
     $(id).addEventListener('change', function () { formToSettings(); process(); });
   });
 
@@ -778,7 +794,9 @@
   }
 
   // ------------------------------------------------------------------ gösterim kontrolleri
-  $('colorMode').onchange = function () { state.hiddenColors = {}; buildLegend(); rebuildPoints(); updateStats(); if (state.drawerMode) renderDrawer(); };
+  $('colorMode').onchange = function () { state.hiddenColors = {}; buildLegend(); rebuildPoints(); updateStats(); renderSummary(); if (state.drawerMode) renderDrawer(); };
+  $('chkSummary').onchange = renderSummary;
+  $('mapTitle').addEventListener('input', renderSummary);
   $('ptSize').oninput = function () {
     $('ptSizeVal').textContent = this.value;
     rebuildPoints();
@@ -809,7 +827,7 @@
   }
   ['mdlColor', 'mdlOpacity', 'mdlWire', 'mdlVisible'].forEach(function (id) { $(id).addEventListener('input', applyModelMaterial); });
   ['mdlTx', 'mdlTy', 'mdlTz', 'mdlRx', 'mdlRy', 'mdlRz', 'mdlScale'].forEach(function (id) { $(id).addEventListener('input', applyModelTransform); });
-  $('mdlRemove').onclick = function () { setModel(null, ''); };
+  $('mdlRemove').onclick = function () { setModel(null, ''); state.modelSrc = null; };
 
   function setModel(obj, name) {
     if (model) {
@@ -834,24 +852,34 @@
     return new THREE.Mesh(g, modelMaterial);
   }
 
+  var MODEL_EXTS = ['stl', 'wrl', 'vrml', 'obj', 'ply', 'glb'];
+  var TEXT_MODELS = ['wrl', 'vrml', 'obj'];
+
   function loadModelFile(file) {
     var ext = file.name.split('.').pop().toLowerCase();
     var r = new FileReader();
     r.onerror = function () { alert('Model okunamadı'); };
     r.onload = function () { loadModelData(ext, r.result, file.name); };
-    if (ext === 'obj') r.readAsText(file); else r.readAsArrayBuffer(file);
+    if (TEXT_MODELS.indexOf(ext) >= 0) r.readAsText(file); else r.readAsArrayBuffer(file);
   }
 
   function loadModelData(ext, data, name) {
+    // Paylaşım dosyasına gömebilmek için ham veriyi sakla
+    state.modelSrc = { ext: ext, name: name, data: data };
     try {
-      if (ext === 'stl') setModel(meshFromGeometry(new THREE.STLLoader().parse(data)), name);
+      if (ext === 'wrl' || ext === 'vrml') {
+        if (typeof data !== 'string') data = new TextDecoder().decode(data);
+        if (/^\s*#VRML V1/i.test(data)) throw new Error('VRML 1.0 desteklenmiyor; CATIA\'dan VRML 97 (V2.0) olarak kaydedin');
+        setModel(new THREE.VRMLLoader().parse(data, ''), name);
+      } else if (ext === 'stl') setModel(meshFromGeometry(new THREE.STLLoader().parse(data)), name);
       else if (ext === 'ply') setModel(meshFromGeometry(new THREE.PLYLoader().parse(data)), name);
       else if (ext === 'obj') setModel(new THREE.OBJLoader().parse(data), name);
       else if (ext === 'glb' || ext === 'gltf') {
         new THREE.GLTFLoader().parse(data, '', function (gltf) { setModel(gltf.scene, name); },
           function (err) { alert('GLTF/GLB okunamadı: ' + (err && err.message || err)); });
-      } else alert('Desteklenmeyen model biçimi: ' + ext);
+      } else { state.modelSrc = null; alert('Desteklenmeyen model biçimi: ' + ext); }
     } catch (err) {
+      state.modelSrc = null;
       alert('Model okunamadı: ' + err.message);
     }
   }
@@ -882,7 +910,7 @@
     var ext = f.name.split('.').pop().toLowerCase();
     if (ext === 'fpdf') setFile('fpdf', f);
     else if (ext === 'mpf' || ext === 'spf') setFile('mpf', f);
-    else if (['stl', 'obj', 'ply', 'glb', 'gltf'].indexOf(ext) >= 0) loadModelFile(f);
+    else if (MODEL_EXTS.indexOf(ext) >= 0) loadModelFile(f);
     else if (ext === 'json') readSettingsFile(f);
     else alert('"' + f.name + '" için dosya türü anlaşılamadı. Lütfen sol paneldeki düğmeleri kullanın.');
   }
@@ -900,14 +928,13 @@
     var D = window.ORNEK_VERI;
     if (!D) { alert('Örnek veri bulunamadı'); return; }
     state.text.fpdf = D.fpdf; state.text.mpf = D.mpf;
+    state.names = { fpdf: 'ornek.fpdf', mpf: 'ornek.mpf' };
     $('lblFpdf').textContent = 'ornek.fpdf'; $('lblFpdf').className = 'fname ok';
     $('lblMpf').textContent = 'ornek.mpf'; $('lblMpf').className = 'fname ok';
     state.firstFit = true;
     process();
     if (D.stlBase64) {
-      var bin = atob(D.stlBase64), buf = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-      loadModelData('stl', buf.buffer, 'ornek_panel.stl');
+      loadModelData('stl', b64ToBuf(D.stlBase64), 'ornek_panel.stl');
     }
   };
 
@@ -929,26 +956,242 @@
 
   $('btnCsv').onclick = function () {
     if (!state.result) return;
-    var rows = [['Baglayici', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN_Sayisi', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
+    var rows = [['Baglayici', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN_Sayisi', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
     state.result.points.forEach(function (p) {
-      rows.push([p.name, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.psenCount, p.exclusive.join(','), p.combo,
+      rows.push([p.name, p.type, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.psenCount, p.exclusive.join(','), p.combo,
         p.processes.map(function (x) { return x.code + '@' + x.line; }).join(' '), p.issues.join(' | ')]);
     });
     state.result.unmatched.forEach(function (u) {
-      rows.push([u.name, '', '', '', '', '', '', '', '', 'FPDF\'de yok', u.processes.map(function (x) { return x.code + '@' + x.line; }).join(' '), 'FPDF\'de yok']);
+      rows.push([u.name, '', '', '', '', '', '', '', '', '', 'FPDF\'de yok', u.processes.map(function (x) { return x.code + '@' + x.line; }).join(' '), 'FPDF\'de yok']);
     });
-    download(baseName() + '_noktalar.csv', '﻿' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'), 'text/csv');
+    download(baseName() + '_noktalar.csv', '\uFEFF' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'), 'text/csv');
   };
   $('btnWarnCsv').onclick = function () {
     var rows = [['Tur', 'Satir', 'Mesaj', 'Icerik']];
     state.warnings.forEach(function (w) { rows.push([warnLabel(w.type), w.line || '', w.msg, w.text || '']); });
-    download(baseName() + '_uyarilar.csv', '﻿' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'), 'text/csv');
+    download(baseName() + '_uyarilar.csv', '\uFEFF' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'), 'text/csv');
   };
+
+  // ------------------------------------------------------------------ özet lejantı
+  // Harita üzerindeki özet: bağlayıcı tipleri, toplamlar ve PSEN sayıları.
+  // Aynı satır listesi hem HTML panelde hem PNG çıktısında kullanılır.
+  function summaryLines() {
+    var r = state.result, pts = r.points;
+    var types = {}, psenPts = 0, psenOps = 0, excl = {};
+    pts.forEach(function (p) {
+      var t = p.type || '(boş)';
+      types[t] = (types[t] || 0) + 1;
+      if (p.psenCount) { psenPts++; psenOps += p.psenCount; }
+      p.exclusive.filter(function (c, i, a) { return a.indexOf(c) === i; }).forEach(function (c) { excl[c] = (excl[c] || 0) + 1; });
+    });
+    var typeColors = $('colorMode').value === 'type' ? colorScheme() : null;
+    var defs = shapeDefs(), lines = [];
+    var meta = [state.names.fpdf, state.names.mpf].filter(Boolean).join(' · ');
+    var when = state.shared ? new Date(state.shared.created) : new Date();
+    lines.push({ kind: 'title', label: $('mapTitle').value.trim() || 'Proses haritası' });
+    lines.push({ kind: 'meta', label: (meta ? meta + ' · ' : '') + when.toLocaleDateString('tr-TR') });
+    lines.push({ kind: 'row', label: 'Toplam bağlayıcı', value: pts.length });
+    lines.push({ kind: 'row', big: true, label: 'PSEN olan nokta', value: psenPts });
+    lines.push({ kind: 'row', label: 'Toplam PSEN işlemi', value: psenOps });
+    lines.push({ kind: 'sec', label: 'Bağlayıcı tipleri' });
+    Object.keys(types).sort(naturalCmp).forEach(function (t) {
+      lines.push({ kind: 'row', label: t, value: types[t], color: typeColors && typeColors.map[t] ? typeColors.map[t].color : null });
+    });
+    lines.push({ kind: 'sec', label: 'Tekil prosesler (nokta)' });
+    defs.forEach(function (d) {
+      if (d.key === 'NONE' || d.key === 'MULTI' || d.key === 'OUT') return;
+      lines.push({ kind: 'row', label: d.label, value: excl[d.key] || 0, shape: d.shape });
+    });
+    lines.push({ kind: 'sec', label: 'Kontrol' });
+    lines.push({ kind: 'row', label: 'MPF\'de olmayan nokta', value: r.summary.notInMpf, shape: 'ring' });
+    lines.push({ kind: 'row', label: 'FPDF\'de olmayan isim', value: r.unmatched.length });
+    if (r.summary.withIssues) lines.push({ kind: 'row', label: 'Kural ihlali', value: r.summary.withIssues, shape: 'star', color: '#ff1744' });
+    return lines;
+  }
+
+  function renderSummary() {
+    var el = $('summary');
+    if (!state.result || !$('chkSummary').checked) { el.hidden = true; return; }
+    var html = '';
+    summaryLines().forEach(function (l) {
+      if (l.kind === 'title') html += '<h4>' + esc(l.label) + '</h4>';
+      else if (l.kind === 'meta') html += '<div class="meta">' + esc(l.label) + '</div>';
+      else if (l.kind === 'sec') html += '<div class="sec">' + esc(l.label) + '</div>';
+      else {
+        var icon = l.shape ? '<canvas data-shape="' + l.shape + '" data-color="' + (l.color || '#c9d3de') + '"></canvas>'
+          : l.color ? '<span class="sw" style="background:' + l.color + '"></span>' : '';
+        html += '<div class="ln' + (l.big ? ' big' : '') + '">' + icon + '<span>' + esc(l.label) + '</span><span class="v">' + l.value + '</span></div>';
+      }
+    });
+    el.innerHTML = html;
+    el.querySelectorAll('canvas[data-shape]').forEach(function (cv) {
+      cv.width = cv.height = 26;
+      drawShape(cv, cv.getAttribute('data-shape'), cv.getAttribute('data-color'), 'rgba(0,0,0,.8)');
+    });
+    el.hidden = false;
+  }
+
+  // PNG çıktısı için özeti 2D tuvale çizer
+  function drawSummaryCanvas(c, pr) {
+    var lines = summaryLines();
+    var pad = 12 * pr, lh = 18 * pr, w = 0, h = pad * 2;
+    var font = function (l) {
+      return (l.kind === 'title' ? '600 ' + 15 * pr : l.big ? '600 ' + 13 * pr : (l.kind === 'meta' || l.kind === 'sec' ? 11 : 12) * pr) + 'px "Segoe UI", sans-serif';
+    };
+    lines.forEach(function (l) {
+      c.font = font(l);
+      var lw = c.measureText(l.label).width + (l.kind === 'row' ? 70 * pr : 0);
+      w = Math.max(w, lw);
+      h += l.kind === 'sec' ? lh * 1.3 : lh;
+    });
+    w = Math.max(w + pad * 2, 220 * pr);
+    var x0 = 10 * pr, y0 = 10 * pr;
+    c.fillStyle = 'rgba(23,30,38,.92)';
+    c.strokeStyle = '#2c3845';
+    c.lineWidth = pr;
+    c.fillRect(x0, y0, w, h);
+    c.strokeRect(x0, y0, w, h);
+    var y = y0 + pad;
+    lines.forEach(function (l) {
+      if (l.kind === 'sec') y += lh * 0.3;
+      c.font = font(l);
+      c.textBaseline = 'middle';
+      var cy = y + lh / 2, x = x0 + pad;
+      c.fillStyle = l.kind === 'meta' || l.kind === 'sec' ? '#8796a8' : '#dbe3ec';
+      if (l.kind === 'row') {
+        var s = 12 * pr;
+        if (l.shape) {
+          var ic = document.createElement('canvas');
+          ic.width = ic.height = Math.round(s * 2);
+          drawShape(ic, l.shape, l.color || '#c9d3de', 'rgba(0,0,0,.8)');
+          c.drawImage(ic, x, cy - s / 2, s, s);
+          x += s + 6 * pr;
+        } else if (l.color) {
+          c.fillStyle = l.color;
+          c.fillRect(x, cy - s / 2, s, s);
+          c.fillStyle = '#dbe3ec';
+          x += s + 6 * pr;
+        }
+        c.fillText(l.label, x, cy);
+        c.textAlign = 'right';
+        c.fillStyle = l.big ? '#66bb6a' : '#dbe3ec';
+        c.fillText(String(l.value), x0 + w - pad, cy);
+        c.textAlign = 'left';
+      } else {
+        c.fillText(l.kind === 'sec' ? l.label.toUpperCase() : l.label, x, cy);
+      }
+      y += lh;
+    });
+  }
+
+  $('btnPng').onclick = function () {
+    if (!state.result) return;
+    renderer.render(scene, camera); // çizim tamponu silinmeden hemen kopyala
+    var src = renderer.domElement, pr = renderer.getPixelRatio();
+    var cv = document.createElement('canvas');
+    cv.width = src.width; cv.height = src.height;
+    var c = cv.getContext('2d');
+    c.drawImage(src, 0, 0);
+    if ($('chkSummary').checked) drawSummaryCanvas(c, pr);
+    cv.toBlob(function (b) { download(shareName() + '.png', b, 'image/png'); });
+  };
+
+  // ------------------------------------------------------------------ paylaşım
+  function bufToB64(buf) {
+    var b = new Uint8Array(buf), s = '', CH = 0x8000;
+    for (var i = 0; i < b.length; i += CH) s += String.fromCharCode.apply(null, b.subarray(i, i + CH));
+    return btoa(s);
+  }
+  function b64ToBuf(b64) {
+    var bin = atob(b64), buf = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return buf.buffer;
+  }
+  function shareName() {
+    var t = $('mapTitle').value.trim() || baseName();
+    return t.replace(/[\\/:*?"<>|]+/g, '_') + '_harita';
+  }
+
+  var VIEW_INPUTS = ['colorMode', 'ptSize', 'chkAxes', 'chkOnTop', 'chkLabels', 'chkSummary', 'mapTitle',
+    'mdlColor', 'mdlOpacity', 'mdlWire', 'mdlVisible', 'mdlTx', 'mdlTy', 'mdlTz', 'mdlRx', 'mdlRy', 'mdlRz', 'mdlScale'];
+
+  function collectShare() {
+    var inputs = {};
+    VIEW_INPUTS.forEach(function (id) { var el = $(id); inputs[id] = el.type === 'checkbox' ? el.checked : el.value; });
+    var m = null, src = state.modelSrc;
+    if (src && model && $('shareModel').checked) {
+      m = { name: src.name, ext: src.ext };
+      if (typeof src.data === 'string') m.text = src.data; else m.b64 = bufToB64(src.data);
+    }
+    return {
+      app: 'proses3d', v: 1, created: new Date().toISOString(),
+      names: state.names, fpdf: state.text.fpdf, mpf: state.text.mpf,
+      settings: state.settings, inputs: inputs,
+      hiddenShapes: state.hiddenShapes, hiddenColors: state.hiddenColors,
+      camera: { position: camera.position.toArray(), target: controls.target.toArray() },
+      model: m
+    };
+  }
+
+  $('btnShare').onclick = function () {
+    if (!state.result) { alert('Önce FPDF dosyasını yükleyin.'); return; }
+    if (!TEMPLATE) {
+      alert('Harita dosyası yalnızca tek dosyalık "Proses3D.html" sürümünden kaydedilebilir.');
+      return;
+    }
+    var json = JSON.stringify(collectShare()).replace(/</g, '\\u003c');
+    var tag = '<script id="paylasimVeri" type="application/json">' + json + '</' + 'script>\n';
+    // Yerine koyma metninde "$" kalıpları yorumlanmasın diye fonksiyon kullanılıyor
+    var html = TEMPLATE.replace('</head>', function () { return tag + '</head>'; });
+    download(shareName() + '.html', html, 'text/html');
+  };
+
+  function applyShare(d) {
+    state.shared = d;
+    state.settings = Proses.mergeSettings(d.settings);
+    settingsToForm();
+    var inputs = d.inputs || {};
+    Object.keys(inputs).forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = !!inputs[id]; else el.value = inputs[id];
+    });
+    $('ptSizeVal').textContent = $('ptSize').value;
+    helpers.visible = $('chkAxes').checked;
+    state.text.fpdf = d.fpdf || '';
+    state.text.mpf = d.mpf || '';
+    state.names = d.names || { fpdf: '', mpf: '' };
+    [['lblFpdf', state.names.fpdf], ['lblMpf', state.names.mpf]].forEach(function (x) {
+      $(x[0]).textContent = x[1] || '—';
+      $(x[0]).className = 'fname' + (x[1] ? ' ok' : '');
+    });
+    state.hiddenShapes = d.hiddenShapes || {};
+    state.hiddenColors = d.hiddenColors || {};
+    state.firstFit = false;
+    process();
+    if (d.model) loadModelData(d.model.ext, d.model.text !== undefined ? d.model.text : b64ToBuf(d.model.b64), d.model.name);
+    if (d.camera) {
+      camera.position.fromArray(d.camera.position);
+      controls.target.fromArray(d.camera.target);
+      var dist = camera.position.distanceTo(controls.target);
+      camera.near = Math.max(dist / 1000, 0.01);
+      camera.far = dist * 100;
+      camera.updateProjectionMatrix();
+      controls.update();
+    } else setView('iso');
+    document.title = ($('mapTitle').value.trim() || 'Proses haritası') + ' - Proses 3D';
+  }
 
   // ------------------------------------------------------------------ başlat
   resize();
   animate();
   refreshAll();
+  // Paylaşılmış harita dosyası olarak açıldıysa gömülü veriyi yükle
+  var shared = document.getElementById('paylasimVeri');
+  if (shared) {
+    try { applyShare(JSON.parse(shared.textContent)); }
+    catch (err) { alert('Harita verisi okunamadı: ' + err.message); }
+  }
   // Test / hata ayıklama için
   window.proses3d = { state: state, process: process, select: select, setView: setView, camera: camera };
 })();

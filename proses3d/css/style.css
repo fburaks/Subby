@@ -81,6 +81,16 @@ code { background: var(--panel-2); padding: 0 4px; border-radius: 3px; }
 #stats { position: absolute; left: 10px; bottom: 10px; color: var(--muted); font-size: 12px; z-index: 4;
   background: rgba(15,20,25,.75); padding: 6px 10px; border-radius: 4px; line-height: 1.5; pointer-events: none; }
 #stats b { color: var(--text); }
+#summary { position: absolute; left: 10px; top: 52px; z-index: 7; min-width: 210px; max-width: 300px; max-height: calc(100% - 170px); overflow: auto;
+  background: rgba(23,30,38,.92); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font-size: 12px; }
+#summary h4 { margin: 0 0 2px; font-size: 14px; }
+#summary .meta { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+#summary .sec { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; margin: 8px 0 3px; }
+#summary .ln { display: flex; align-items: center; gap: 7px; padding: 1px 0; }
+#summary .ln canvas, #summary .ln .sw { width: 13px; height: 13px; flex: none; border-radius: 2px; }
+#summary .ln .v { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; padding-left: 12px; }
+#summary .ln.big { font-size: 13px; }
+#summary .ln.big .v { color: #66bb6a; }
 #tooltip { position: absolute; z-index: 20; pointer-events: none; background: rgba(23,30,38,.95); border: 1px solid var(--line);
   border-radius: 4px; padding: 6px 8px; font-size: 12px; max-width: 280px; white-space: nowrap; }
 #tooltip .t { font-weight: 600; }
