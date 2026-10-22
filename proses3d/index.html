@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proses 3D Görüntüleyici</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <!-- ======================= SOL PANEL ======================= -->
+  <aside id="sidebar">
+    <header class="brand">
+      <h1>Proses 3D</h1>
+      <span class="sub">FPDF + MPF nokta bulutu</span>
+    </header>
+
+    <details open>
+      <summary>Dosyalar</summary>
+      <div class="filerow">
+        <label class="btn file">FPDF yükle<input type="file" id="inFpdf" accept=".fpdf,.txt,.csv,*"></label>
+        <span id="lblFpdf" class="fname">—</span>
+      </div>
+      <div class="filerow">
+        <label class="btn file">MPF yükle<input type="file" id="inMpf" accept=".mpf,.txt,*"></label>
+        <span id="lblMpf" class="fname">—</span>
+      </div>
+      <div class="filerow">
+        <label class="btn file">3D model<input type="file" id="inModel" accept=".stl,.obj,.ply,.glb,.gltf"></label>
+        <span id="lblModel" class="fname">—</span>
+      </div>
+      <div class="row">
+        <label>Karakter kodlaması</label>
+        <select id="encoding">
+          <option value="utf-8">UTF-8</option>
+          <option value="windows-1254">Windows-1254 (Türkçe)</option>
+          <option value="windows-1252">Windows-1252</option>
+        </select>
+      </div>
+      <p class="hint">Dosyaları pencereye sürükleyip bırakabilirsiniz. Desteklenen modeller: STL, OBJ, PLY, GLB.</p>
+    </details>
+
+    <details>
+      <summary>FPDF sütunları</summary>
+      <p class="hint">Sütun numaraları 1'den başlar. <code>$</code> ile başlayan satırlar yorum kabul edilir.</p>
+      <div class="grid2">
+        <label>Ayraç</label><input id="cfgDelim" type="text" value=",">
+        <label>Proses kodu</label><input id="cfgProc" type="number" min="1">
+        <label>Bağlayıcı ismi</label><input id="cfgName" type="number" min="1">
+        <label>X</label><input id="cfgX" type="number" min="1">
+        <label>Y</label><input id="cfgY" type="number" min="1">
+        <label>Z</label><input id="cfgZ" type="number" min="1">
+      </div>
+      <div id="fpdfPreview" class="preview"></div>
+    </details>
+
+    <details>
+      <summary>MPF kuralları</summary>
+      <div class="grid2">
+        <label>Pozisyon kodları</label><input id="cfgPos" type="text">
+        <label>Proses kodları</label><input id="cfgProcKw" type="text">
+        <label>Tekil prosesler</label><input id="cfgExcl" type="text">
+        <label>Tekrarlı proses</label><input id="cfgRep" type="text">
+        <label>İsim kaynağı</label>
+        <select id="cfgNameSrc">
+          <option value="auto">Otomatik (önce pozisyon satırı)</option>
+          <option value="position">Pozisyon satırı (AXPOS/LIN)</option>
+          <option value="process">Proses satırı</option>
+        </select>
+        <label>Harf duyarsız</label><input id="cfgCI" type="checkbox">
+      </div>
+      <p class="hint">İsim, satırdaki <code>;</code> işaretinden sonra gelen metindir. Bir pozisyon satırından sonraki prosesler, bir sonraki pozisyon satırına kadar o bağlayıcıya aittir.</p>
+      <div class="row"><button id="btnApply" class="btn primary">Uygula / Yeniden işle</button><button id="btnReset" class="btn">Varsayılan</button></div>
+    </details>
+
+    <details open>
+      <summary>Gösterim</summary>
+      <div class="row">
+        <label>Renklendirme</label>
+        <select id="colorMode">
+          <option value="status">Durum (PSEN sayısı)</option>
+          <option value="combo">Proses kombinasyonu</option>
+          <option value="fpdf">FPDF proses kodu</option>
+          <option value="z">Z yüksekliği</option>
+        </select>
+      </div>
+      <div class="row"><label>Nokta boyutu</label><input id="ptSize" type="range" min="4" max="40" value="14"><span id="ptSizeVal">14</span></div>
+      <div class="row"><label><input id="chkLabels" type="checkbox"> Seçili isim etiketi</label></div>
+      <div class="row"><label><input id="chkAxes" type="checkbox" checked> Eksen / ızgara</label></div>
+      <div class="row"><label><input id="chkOnTop" type="checkbox"> Noktalar model önünde</label></div>
+    </details>
+
+    <details open>
+      <summary>Lejant ve filtre</summary>
+      <div id="legendShape" class="legend"></div>
+      <div id="legendColor" class="legend"></div>
+    </details>
+
+    <details>
+      <summary>3D model</summary>
+      <div class="row"><label>Renk</label><input id="mdlColor" type="color" value="#8aa4c8"></div>
+      <div class="row"><label>Opaklık</label><input id="mdlOpacity" type="range" min="0" max="1" step="0.05" value="0.45"></div>
+      <div class="row"><label><input id="mdlWire" type="checkbox"> Tel kafes</label><label><input id="mdlVisible" type="checkbox" checked> Görünür</label></div>
+      <div class="grid4">
+        <span></span><span>X</span><span>Y</span><span>Z</span>
+        <label>Öteleme</label><input id="mdlTx" type="number" step="any" value="0"><input id="mdlTy" type="number" step="any" value="0"><input id="mdlTz" type="number" step="any" value="0">
+        <label>Dönme°</label><input id="mdlRx" type="number" step="any" value="0"><input id="mdlRy" type="number" step="any" value="0"><input id="mdlRz" type="number" step="any" value="0">
+      </div>
+      <div class="row"><label>Ölçek</label><input id="mdlScale" type="number" step="any" value="1"></div>
+      <div class="row"><button id="mdlRemove" class="btn">Modeli kaldır</button></div>
+    </details>
+
+    <details>
+      <summary>Dışa aktar</summary>
+      <div class="row"><button id="btnCsv" class="btn">Nokta listesi (CSV)</button></div>
+      <div class="row"><button id="btnWarnCsv" class="btn">Uyarılar (CSV)</button></div>
+    </details>
+
+    <details>
+      <summary>Ayarlar</summary>
+      <div class="row"><button id="btnSettingsExport" class="btn">Ayarları kaydet (JSON)</button></div>
+      <div class="row"><label class="btn file">Ayarları yükle<input type="file" id="inSettings" accept=".json"></label></div>
+    </details>
+  </aside>
+
+  <!-- ======================= 3D GÖRÜNÜM ======================= -->
+  <main id="viewport">
+    <div id="toolbar">
+      <input id="search" type="search" placeholder="Bağlayıcı ara…" autocomplete="off">
+      <button class="btn" data-view="fit" title="Tümünü sığdır">Sığdır</button>
+      <button class="btn" data-view="top" title="Üstten (Z)">Üst</button>
+      <button class="btn" data-view="front" title="Önden (-Y)">Ön</button>
+      <button class="btn" data-view="side" title="Yandan (+X)">Yan</button>
+      <button class="btn" data-view="iso" title="İzometrik">İzo</button>
+      <button class="btn" id="btnTable">Tablo</button>
+      <button class="btn" id="btnWarn">Uyarılar <span id="warnCount" class="badge">0</span></button>
+    </div>
+    <div id="stats"></div>
+    <div id="tooltip" hidden></div>
+    <div id="label3d" hidden></div>
+    <div id="dropHint" hidden>Dosyaları buraya bırakın</div>
+    <div id="empty">
+      <h2>Başlamak için dosya yükleyin</h2>
+      <p>Sol panelden <b>FPDF</b> (nokta bulutu) ve <b>MPF</b> (prosesler) dosyalarını seçin veya pencereye sürükleyin.</p>
+      <button class="btn primary" id="btnDemo">Örnek veriyi göster</button>
+    </div>
+
+    <!-- Seçili nokta detayları -->
+    <section id="info" hidden>
+      <button class="close" data-close="info">×</button>
+      <div id="infoBody"></div>
+    </section>
+
+    <!-- Alt panel: tablo / uyarılar -->
+    <section id="drawer" hidden>
+      <div class="drawer-head">
+        <strong id="drawerTitle"></strong>
+        <input id="drawerFilter" type="search" placeholder="Filtrele…">
+        <span id="drawerInfo" class="muted"></span>
+        <button class="close" data-close="drawer">×</button>
+      </div>
+      <div id="drawerBody"></div>
+    </section>
+  </main>
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="lib/STLLoader.js"></script>
+<script src="lib/OBJLoader.js"></script>
+<script src="lib/PLYLoader.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script src="js/parser.js"></script>
+<script src="ornek/ornek-data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
