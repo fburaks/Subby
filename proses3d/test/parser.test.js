@@ -35,8 +35,9 @@ var r = P.match(fpdf, mpf);
 var by = {};
 r.points.forEach(function (p) { by[p.name] = p; });
 assert.strictEqual(by.A1.psenCount, 2);
+assert.strictEqual(by.A1.hasPsen, true);
 assert.deepStrictEqual(by.A1.exclusive, ['CS']);
-assert.strictEqual(by.A1.combo, 'PSEN×2 + CS');
+assert.strictEqual(by.A1.combo, 'PSEN + CS'); // PSEN tekrarı tek sayılır
 assert.strictEqual(by.A2.secondary, 'MULTI');
 assert.strictEqual(by.A2.issues.length, 1);
 assert.strictEqual(by.A3.inMpf, true);
@@ -82,21 +83,21 @@ assert.strictEqual(rm.blocks[0].name, 'Point_No--Fst-1962');
 assert.strictEqual(rm.processes[0].args, '1');
 assert.strictEqual(rm.warnings.length, 0);
 
-// FPDF'de kısa isim ("Fst-1959") olsa da sonek ile eşleşir
-var rf = P.parseFPDF('A,Fst-1959,1,2,3\nB,Fst-1957,4,5,6\nC,Fst-1962,7,8,9\nD,Fst-1963,1,1,1\n');
+// İsimler birebir eşleşir
+var rf = P.parseFPDF('A,Point_No--Fst-1959,1,2,3\nB,Point_No--Fst-1957,4,5,6\nC,Point_No--Fst-1962,7,8,9\nD,Point_No--Fst-1963,1,1,1\n');
 var rr = P.match(rf, rm);
 var rb = {};
 rr.points.forEach(function (p) { rb[p.name] = p; });
-assert.strictEqual(rb['Fst-1959'].psenCount, 2);
-assert.deepStrictEqual(rb['Fst-1959'].exclusive, ['DNOCLAMP']);
-assert.strictEqual(rb['Fst-1959'].positionCount, 2);
-assert.strictEqual(rb['Fst-1957'].combo, 'DONLY');
-assert.strictEqual(rb['Fst-1963'].combo, 'PSEN + DNOCLAMP');
+assert.strictEqual(rb['Point_No--Fst-1959'].hasPsen, true);
+assert.deepStrictEqual(rb['Point_No--Fst-1959'].exclusive, ['DNOCLAMP']);
+assert.strictEqual(rb['Point_No--Fst-1959'].positionCount, 2);
+assert.deepStrictEqual(rb['Point_No--Fst-1959'].blocks[0].machine, [-864.5781, 323.449, 1647.5355, 1065.979, -24.9612, 0]);
+assert.strictEqual(rb['Point_No--Fst-1959'].combo, 'PSEN + DNOCLAMP');
+assert.strictEqual(rb['Point_No--Fst-1957'].combo, 'DONLY');
+assert.strictEqual(rb['Point_No--Fst-1963'].combo, 'PSEN + DNOCLAMP');
 assert.strictEqual(rr.unmatched.length, 0);
-// Tam isimle de eşleşir
-var rf2 = P.parseFPDF('A,Point_No--Fst-1959,1,2,3\n');
-assert.strictEqual(P.match(rf2, rm).points[0].psenCount, 2);
-// Sonek kapalıysa kısa isim eşleşmez
-assert.strictEqual(P.match(P.parseFPDF('A,Fst-1959,1,2,3\n'), rm, { suffixMatch: false }).points[0].inMpf, false);
+// Fark varsa eşleşmez: kısa isim veya farklı harf
+assert.strictEqual(P.match(P.parseFPDF('A,Fst-1959,1,2,3\n'), rm).points[0].inMpf, false);
+assert.strictEqual(P.match(P.parseFPDF('A,POINT_NO--FST-1959,1,2,3\n'), rm).points[0].inMpf, false);
 
 console.log('gerçek biçim testleri geçti');

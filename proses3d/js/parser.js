@@ -31,10 +31,8 @@
       // 'auto' | 'position' | 'process'
       nameSource: 'auto'
     },
-    // İsim eşleştirmede büyük/küçük harf ve boşluk farkını yok say
-    matchCaseInsensitive: true,
-    // Tam eşleşme yoksa sonek ile eşleştir (ör. "Point_No--Fst-1962" <-> "Fst-1962")
-    suffixMatch: true
+    // İsimler birebir eşleşmeli; true yapılırsa büyük/küçük harf farkı yok sayılır
+    matchCaseInsensitive: false
   };
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -46,7 +44,6 @@
       if (s[k]) for (var key in s[k]) if (s[k][key] !== undefined && s[k][key] !== '') out[k][key] = s[k][key];
     });
     if (s.matchCaseInsensitive !== undefined) out.matchCaseInsensitive = !!s.matchCaseInsensitive;
-    if (s.suffixMatch !== undefined) out.suffixMatch = !!s.suffixMatch;
     return out;
   }
 
@@ -172,7 +169,10 @@
       var m;
       if (posRe && (m = code.match(posRe))) {
         stats.positions++;
-        cur = { index: blocks.length, keyword: m[1].toUpperCase(), line: lineNo, text: line, name: tail, processes: [] };
+        // AXPOS(x,y,z,i,j,k,...) / LIN(...) değerleri makine eksenindedir; yalnızca bilgi için saklanır
+        var nums = ((code.slice(m[1].length).match(/\(([^)]*)\)/) || [])[1] || '').split(',').map(Number);
+        cur = { index: blocks.length, keyword: m[1].toUpperCase(), line: lineNo, text: line, name: tail, processes: [],
+          machine: nums.length >= 3 && nums.slice(0, 6).every(isFinite) ? nums.slice(0, 6) : null };
         blocks.push(cur);
         continue;
       }
@@ -227,10 +227,12 @@
     fpdf.points.forEach(function (pt) {
       var key = normName(pt.name, ci);
       pt.processes = [];
-      pt.psenCount = 0;
+      pt.psenCount = 0;       // PSEN satırı sayısı (yalnızca bilgi)
+      pt.hasPsen = false;     // sayımlar ve gösterim bunu kullanır: PSEN yapılan pozisyon
       pt.exclusive = [];      // bulunan özel prosesler (CS/DONLY/DNOCLAMP)
       pt.issues = [];
       pt.positionCount = 0;   // MPF'de bu isme ait pozisyon satırı sayısı
+      pt.blocks = [];
       if (!byName[key]) byName[key] = [];
       else if (byName[key].length === 1) {
         warnings.push({ type: 'fpdf-dup', line: pt.line, msg: 'FPDF: "' + pt.name + '" ismi birden fazla satırda var (satır ' + byName[key][0].line + ', ' + pt.line + '...)' });
@@ -238,41 +240,11 @@
       byName[key].push(pt);
     });
 
-    // Sonek dizini: "Point_No--Fst-1962" için "-Fst-1962" ayracından sonrası "Fst-1962", "1962" ...
-    var SEP = /[\-_ .:\/]/;
-    var suffixIndex = Object.create(null);
-    if (s.suffixMatch) {
-      Object.keys(byName).forEach(function (k) {
-        for (var i = 0; i < k.length - 1; i++) {
-          if (!SEP.test(k[i]) || SEP.test(k[i + 1])) continue;
-          var suf = k.slice(i + 1);
-          (suffixIndex[suf] = suffixIndex[suf] || []).push(k);
-        }
-      });
-    }
-    var resolved = Object.create(null), suffixMatched = {};
-    function lookup(name) {
-      var key = normName(name, ci);
-      if (key in resolved) return resolved[key];
-      var res = byName[key] || null;
-      if (!res && s.suffixMatch && key) {
-        // 1) MPF ismi FPDF isminin sonunda: FPDF uzun, MPF kısa
-        var cands = suffixIndex[key];
-        if (cands && cands.length === 1) res = byName[cands[0]];
-        // 2) FPDF ismi MPF isminin sonunda: MPF uzun ("Point_No--Fst-1962"), en uzun sonek seçilir
-        if (!res) {
-          for (var i = 0; i < key.length - 1 && !res; i++) {
-            if (SEP.test(key[i]) && !SEP.test(key[i + 1]) && byName[key.slice(i + 1)]) res = byName[key.slice(i + 1)];
-          }
-        }
-        if (res) suffixMatched[key] = { from: String(name).trim(), to: res[0].name };
-      }
-      return (resolved[key] = res);
-    }
+    function lookup(name) { return byName[normName(name, ci)] || null; }
 
     mpf.blocks.forEach(function (b) {
       var t = lookup(b.name);
-      if (t) t.forEach(function (pt) { pt.positionCount++; });
+      if (t) t.forEach(function (pt) { pt.positionCount++; pt.blocks.push(b); });
     });
 
     var unmatched = Object.create(null); // MPF'de olup FPDF'de olmayan isimler
@@ -286,7 +258,7 @@
       }
       targets.forEach(function (pt) {
         pt.processes.push(proc);
-        if (proc.code === repeatable) pt.psenCount++;
+        if (proc.code === repeatable) { pt.psenCount++; pt.hasPsen = true; }
         if (exclusive.indexOf(proc.code) >= 0) pt.exclusive.push(proc.code);
       });
     });
@@ -319,20 +291,14 @@
       warnings.push({ type: 'mpf-unmatched', line: u.processes[0].line, name: u.name, msg: 'MPF: "' + (u.name || '(isimsiz)') + '" FPDF\'de yok (' + u.processes.length + ' proses, ilk satır ' + u.processes[0].line + ')' });
     });
 
-    var sm = Object.keys(suffixMatched);
-    if (sm.length) {
-      warnings.push({ type: 'match-suffix', msg: sm.length + ' MPF ismi FPDF ile sonek üzerinden eşleşti (ör. "' + suffixMatched[sm[0]].from + '" → "' + suffixMatched[sm[0]].to + '")' });
-    }
-
     return { points: fpdf.points, unmatched: unmatchedList, warnings: warnings, summary: summary };
   }
 
-  // "PSEN×2 + CS" gibi okunabilir kombinasyon anahtarı
+  // "PSEN + CS" gibi okunabilir kombinasyon anahtarı (PSEN kaç kez olursa olsun bir kez sayılır)
   function comboKey(pt) {
     if (!pt.inMpf) return 'MPF\'de yok';
     var parts = [];
-    if (pt.psenCount === 1) parts.push('PSEN');
-    else if (pt.psenCount > 1) parts.push('PSEN×' + pt.psenCount);
+    if (pt.hasPsen) parts.push('PSEN');
     if (pt.secondary === 'MULTI') parts.push('ÇOKLU');
     else if (pt.secondary !== 'NONE') parts.push(pt.secondary);
     return parts.join(' + ') || '(proses yok)';

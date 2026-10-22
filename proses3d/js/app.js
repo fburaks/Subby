@@ -3,7 +3,7 @@
   'use strict';
 
   var $ = function (id) { return document.getElementById(id); };
-  var STORE_KEY = 'proses3d.settings.v1';
+  var STORE_KEY = 'proses3d.settings.v2';
 
   // Paylaşım dosyası için sayfanın kendisi şablon olarak saklanır. Bu yalnızca tüm kaynakların
   // gömülü olduğu tek dosyalık Proses3D.html sürümünde mümkündür.
@@ -115,16 +115,14 @@
   var STATUS = [
     { key: 'out', label: 'MPF\'de yok', color: '#5f6b78' },
     { key: 'p0', label: 'PSEN yok', color: '#29b6f6' },
-    { key: 'p1', label: 'PSEN ×1', color: '#66bb6a' },
-    { key: 'p2', label: 'PSEN ×2', color: '#ffa726' },
-    { key: 'p3', label: 'PSEN ×3+', color: '#ec407a' },
+    { key: 'p1', label: 'PSEN var', color: '#66bb6a' },
     { key: 'err', label: 'Kural ihlali', color: '#ff1744' }
   ];
 
   function statusKey(pt) {
     if (pt.issues.length) return 'err';
     if (!pt.inMpf) return 'out';
-    return pt.psenCount >= 3 ? 'p3' : 'p' + pt.psenCount;
+    return pt.hasPsen ? 'p1' : 'p0';
   }
 
   // Seçili moda göre {key -> {label,color,count}} kategori listesi ve nokta->anahtar fonksiyonu
@@ -510,11 +508,17 @@
       '<tr><td>X / Y / Z</td><td>' + fmt(p.x) + ' / ' + fmt(p.y) + ' / ' + fmt(p.z) + '</td></tr>' +
       '<tr><td>FPDF satırı</td><td>' + p.line + '</td></tr>' +
       '<tr><td>MPF pozisyon</td><td>' + p.positionCount + ' kez</td></tr>' +
-      '<tr><td>PSEN</td><td>' + p.psenCount + ' kez</td></tr>' +
+      '<tr><td>PSEN</td><td>' + (p.hasPsen ? 'Var' : 'Yok') + '</td></tr>' +
       '<tr><td>Tekil proses</td><td>' + esc(excl) + '</td></tr>' +
       '<tr><td>Kombinasyon</td><td>' + esc(p.combo) + '</td></tr>' +
       '</table>';
     p.issues.forEach(function (i) { html += '<div class="issue">⚠ ' + esc(i) + '</div>'; });
+    // MPF'deki makine ekseni pozisyonları (3D görünüm FPDF tasarım eksenini kullanır)
+    p.blocks.forEach(function (b) {
+      if (!b.machine) return;
+      html += '<div class="muted" style="font-size:11px">Makine ' + esc(b.keyword) + ' (satır ' + b.line + '): ' +
+        b.machine.map(fmt).join(', ') + '</div>';
+    });
     if (p.processes.length) {
       html += '<div class="muted" style="margin-top:8px">MPF prosesleri</div>';
       p.processes.forEach(function (pr) {
@@ -610,7 +614,7 @@
     { key: 'type', label: 'Tip' },
     { key: 'fpdfProc', label: 'FPDF proses' },
     { key: 'x', label: 'X', num: true }, { key: 'y', label: 'Y', num: true }, { key: 'z', label: 'Z', num: true },
-    { key: 'psenCount', label: 'PSEN', num: true },
+    { key: 'psenStr', label: 'PSEN' },
     { key: 'exclusiveStr', label: 'Tekil proses' },
     { key: 'combo', label: 'Kombinasyon' },
     { key: 'issueStr', label: 'Uyarı' }
@@ -642,7 +646,7 @@
         if (!q) return true;
         return (p.name + ' ' + p.fpdfProc + ' ' + p.combo).toUpperCase().indexOf(q) >= 0;
       });
-      rows.forEach(function (p) { p.exclusiveStr = p.exclusive.join(', '); p.issueStr = p.issues.join('; '); });
+      rows.forEach(function (p) { p.exclusiveStr = p.exclusive.join(', '); p.psenStr = p.hasPsen ? 'Var' : ''; p.issueStr = p.issues.join('; '); });
       var sk = state.sort.key, dir = state.sort.dir;
       rows.sort(function (a, b) {
         var va = a[sk], vb = b[sk];
@@ -657,7 +661,7 @@
         html += '<tr class="clickable" data-id="' + p.id + '">' + COLS.map(function (c) {
           var v = p[c.key];
           if (c.key === 'name') return '<td><span class="dot" style="background:' + scheme.colorOf(p) + '"></span>' + esc(v) + '</td>';
-          if (c.num) return '<td class="num">' + (c.key === 'psenCount' ? v : fmt(v)) + '</td>';
+          if (c.num) return '<td class="num">' + fmt(v) + '</td>';
           return '<td' + (c.key === 'issueStr' && v ? ' class="bad"' : '') + '>' + esc(v) + '</td>';
         }).join('') + '</tr>';
       });
@@ -688,7 +692,7 @@
     return {
       'fpdf-short': 'FPDF eksik alan', 'fpdf-coord': 'FPDF koordinat', 'fpdf-noname': 'FPDF isim', 'fpdf-dup': 'FPDF tekrar',
       'mpf-orphan': 'MPF sahipsiz', 'mpf-noname': 'MPF isim', 'mpf-namediff': 'MPF isim farkı', 'mpf-unmatched': 'FPDF\'de yok',
-      'rule-exclusive': 'Kural ihlali', 'match-suffix': 'Sonek eşleşme'
+      'rule-exclusive': 'Kural ihlali'
     }[t] || t;
   }
 
@@ -756,7 +760,6 @@
   function settingsToForm() {
     FORM.forEach(function (f) { $(f[0]).value = state.settings[f[1]][f[2]]; });
     $('cfgCI').checked = state.settings.matchCaseInsensitive;
-    $('cfgSuffix').checked = state.settings.suffixMatch;
   }
   function formToSettings() {
     FORM.forEach(function (f) {
@@ -765,7 +768,6 @@
       state.settings[f[1]][f[2]] = v;
     });
     state.settings.matchCaseInsensitive = $('cfgCI').checked;
-    state.settings.suffixMatch = $('cfgSuffix').checked;
     saveSettings();
   }
   settingsToForm();
@@ -958,9 +960,9 @@
 
   $('btnCsv').onclick = function () {
     if (!state.result) return;
-    var rows = [['Baglayici', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN_Sayisi', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
+    var rows = [['Baglayici', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
     state.result.points.forEach(function (p) {
-      rows.push([p.name, p.type, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.psenCount, p.exclusive.join(','), p.combo,
+      rows.push([p.name, p.type, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.hasPsen ? 1 : 0, p.exclusive.join(','), p.combo,
         p.processes.map(function (x) { return x.code + '@' + x.line; }).join(' '), p.issues.join(' | ')]);
     });
     state.result.unmatched.forEach(function (u) {
@@ -979,11 +981,11 @@
   // Aynı satır listesi hem HTML panelde hem PNG çıktısında kullanılır.
   function summaryLines() {
     var r = state.result, pts = r.points;
-    var types = {}, psenPts = 0, psenOps = 0, excl = {};
+    var types = {}, psenPts = 0, excl = {};
     pts.forEach(function (p) {
       var t = p.type || '(boş)';
       types[t] = (types[t] || 0) + 1;
-      if (p.psenCount) { psenPts++; psenOps += p.psenCount; }
+      if (p.hasPsen) psenPts++;
       p.exclusive.filter(function (c, i, a) { return a.indexOf(c) === i; }).forEach(function (c) { excl[c] = (excl[c] || 0) + 1; });
     });
     var typeColors = $('colorMode').value === 'type' ? colorScheme() : null;
@@ -994,7 +996,6 @@
     lines.push({ kind: 'meta', label: (meta ? meta + ' · ' : '') + when.toLocaleDateString('tr-TR') });
     lines.push({ kind: 'row', label: 'Toplam bağlayıcı', value: pts.length });
     lines.push({ kind: 'row', big: true, label: 'PSEN olan nokta', value: psenPts });
-    lines.push({ kind: 'row', label: 'Toplam PSEN işlemi', value: psenOps });
     lines.push({ kind: 'sec', label: 'Bağlayıcı tipleri' });
     Object.keys(types).sort(naturalCmp).forEach(function (t) {
       lines.push({ kind: 'row', label: t, value: types[t], color: typeColors && typeColors.map[t] ? typeColors.map[t].color : null });

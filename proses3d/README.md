@@ -27,6 +27,8 @@ Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yenide
 - `AXPOS` veya `LIN` ile başlayan satırlar **pozisyon** satırıdır.
 - Pozisyondan sonra gelen `PSEN`, `CS`, `DONLY`, `DNOCLAMP` satırları **proses**tir.
 - Örnek satır: `N023515 AXPOS(-855.2109,274.6084,1593.9438,1133.4849,-18.9635,0,0);- Point_No--Fst-1962`
+- AXPOS / LIN değerleri (x, y, z, i, j, k) makine eksenindedir; detay panelinde bilgi olarak
+  gösterilir. 3D görünüm FPDF'deki tasarım ekseni koordinatlarını kullanır.
 - `N023540 ;PDP(...)` gibi `;` ile yoruma alınmış komutlar yok sayılır. `NSEN`, `DSEN`, `LUP`, `LD`
   gibi diğer komutlar proses sayılmaz.
 - Bağlayıcı ismi satırdaki `;` işaretinden sonraki metindir (baştaki `-` ve boşluklar atılır). Bir pozisyon satırından sonraki tüm
@@ -35,10 +37,10 @@ Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yenide
   *MPF kuralları* bölümünden değiştirilebilir.
 
 ### Eşleştirme ve kurallar
-- FPDF ve MPF, bağlayıcı ismi üzerinden eşleştirilir (varsayılan: büyük/küçük harf duyarsız).
-  Tam eşleşme yoksa sonek ile eşleştirilir: MPF'deki `Point_No--Fst-1962`, FPDF'deki `Fst-1962`
-  ile eşleşir (veya tersi). *MPF kuralları → Sonek eşleşme* ile kapatılabilir.
-- `PSEN` bir noktada 0 veya daha fazla kez olabilir.
+- FPDF ve MPF, bağlayıcı ismi üzerinden **birebir** eşleştirilir; en küçük fark varsa eşleşmez.
+  (İstenirse *MPF kuralları → Harf farkını yok say* açılabilir.)
+- `PSEN` bir noktada 0 veya daha fazla kez olabilir; sayımlarda **bir kez** sayılır
+  (amaç PSEN yapılan pozisyon sayısıdır).
 - `CS` / `DONLY` / `DNOCLAMP` ("tekil prosesler") bir noktada en fazla **bir** kez ve yalnızca
   biri olabilir; ek olarak PSEN bulunabilir. Aksi durum **kural ihlali** olarak işaretlenir.
 - FPDF'de olup MPF'de olmayan noktalar gri halka ile, MPF'de olup FPDF'de olmayan isimler
@@ -47,15 +49,14 @@ Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yenide
 ## Görselleştirme
 - **Şekil** = tekil proses: daire (yok), kare (CS), üçgen (DONLY), eşkenar dörtgen (DNOCLAMP),
   yıldız (birden fazla — hata), halka (MPF'de yok).
-- **Renk** = varsayılan olarak bağlayıcı tipi; ayrıca durum (PSEN sayısı / kural ihlali),
+- **Renk** = varsayılan olarak bağlayıcı tipi; ayrıca durum (PSEN var/yok / kural ihlali),
   proses kombinasyonu, FPDF proses kodu, Z yüksekliği seçilebilir.
 - Lejanttaki kutucuklarla kategoriler gizlenip gösterilebilir.
 - Noktaya tıklayınca sağda detay paneli (MPF satır numaraları ve satır içerikleri), çift tıklayınca odaklanma.
 - Arama kutusu: eşleşen noktalar vurgulanır, Enter ile ilk sonuca gidilir.
 - *Tablo* ve *Uyarılar* panelleri, CSV dışa aktarma (Excel için `;` ayraçlı).
 - 3D model: renk, opaklık, tel kafes, öteleme / dönme / ölçek ile noktalara hizalama.
-- **Özet lejantı** (harita üzerinde): harita başlığı, toplam bağlayıcı, PSEN olan nokta ve toplam
-  PSEN işlemi, bağlayıcı tiplerine göre sayılar, tekil proses sayıları ve kontrol sayıları.
+- **Özet lejantı** (harita üzerinde): harita başlığı, toplam bağlayıcı, PSEN olan nokta, bağlayıcı tiplerine göre sayılar, tekil proses sayıları ve kontrol sayıları.
   Bağlayıcı tipi varsayılan olarak FPDF proses kodu sütunudur; *FPDF sütunları* bölümünden
   ayrı bir sütun seçilebilir.
 
