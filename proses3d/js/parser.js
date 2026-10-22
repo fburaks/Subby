@@ -32,7 +32,9 @@
       nameSource: 'auto'
     },
     // İsim eşleştirmede büyük/küçük harf ve boşluk farkını yok say
-    matchCaseInsensitive: true
+    matchCaseInsensitive: true,
+    // Tam eşleşme yoksa sonek ile eşleştir (ör. "Point_No--Fst-1962" <-> "Fst-1962")
+    suffixMatch: true
   };
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -44,6 +46,7 @@
       if (s[k]) for (var key in s[k]) if (s[k][key] !== undefined && s[k][key] !== '') out[k][key] = s[k][key];
     });
     if (s.matchCaseInsensitive !== undefined) out.matchCaseInsensitive = !!s.matchCaseInsensitive;
+    if (s.suffixMatch !== undefined) out.suffixMatch = !!s.suffixMatch;
     return out;
   }
 
@@ -159,9 +162,11 @@
       // Satırı kod ve ";" sonrası açıklama olarak ayır
       var semi = line.indexOf(';');
       var code = (semi >= 0 ? line.slice(0, semi) : line).trim();
-      var tail = semi >= 0 ? line.slice(semi + 1).trim() : '';
+      // ";- Point_No--Fst-1962" -> "Point_No--Fst-1962" (baştaki tire ve boşluklar atılır)
+      var tail = semi >= 0 ? line.slice(semi + 1).replace(/^[\s\-]+/, '').trim() : '';
       // Siemens blok numarası (N10 ...) varsa at
-      code = code.replace(/^N\d+\s+/i, '');
+      // "N023540 ;PDP(...)" gibi yoruma alınmış satırlarda kod kısmı boş kalır
+      code = code.replace(/^N\d+\s*/i, '');
       if (!code) { stats.ignored++; continue; }
 
       var m;
@@ -189,6 +194,7 @@
         }
         var p = {
           code: m[1].toUpperCase(),
+          args: (code.slice(m[1].length).match(/^\s*\(([^)]*)\)/) || [])[1] || '',
           name: name,
           line: lineNo,
           text: line,
@@ -232,15 +238,47 @@
       byName[key].push(pt);
     });
 
+    // Sonek dizini: "Point_No--Fst-1962" için "-Fst-1962" ayracından sonrası "Fst-1962", "1962" ...
+    var SEP = /[\-_ .:\/]/;
+    var suffixIndex = Object.create(null);
+    if (s.suffixMatch) {
+      Object.keys(byName).forEach(function (k) {
+        for (var i = 0; i < k.length - 1; i++) {
+          if (!SEP.test(k[i]) || SEP.test(k[i + 1])) continue;
+          var suf = k.slice(i + 1);
+          (suffixIndex[suf] = suffixIndex[suf] || []).push(k);
+        }
+      });
+    }
+    var resolved = Object.create(null), suffixMatched = {};
+    function lookup(name) {
+      var key = normName(name, ci);
+      if (key in resolved) return resolved[key];
+      var res = byName[key] || null;
+      if (!res && s.suffixMatch && key) {
+        // 1) MPF ismi FPDF isminin sonunda: FPDF uzun, MPF kısa
+        var cands = suffixIndex[key];
+        if (cands && cands.length === 1) res = byName[cands[0]];
+        // 2) FPDF ismi MPF isminin sonunda: MPF uzun ("Point_No--Fst-1962"), en uzun sonek seçilir
+        if (!res) {
+          for (var i = 0; i < key.length - 1 && !res; i++) {
+            if (SEP.test(key[i]) && !SEP.test(key[i + 1]) && byName[key.slice(i + 1)]) res = byName[key.slice(i + 1)];
+          }
+        }
+        if (res) suffixMatched[key] = { from: String(name).trim(), to: res[0].name };
+      }
+      return (resolved[key] = res);
+    }
+
     mpf.blocks.forEach(function (b) {
-      var t = byName[normName(b.name, ci)];
+      var t = lookup(b.name);
       if (t) t.forEach(function (pt) { pt.positionCount++; });
     });
 
     var unmatched = Object.create(null); // MPF'de olup FPDF'de olmayan isimler
     mpf.processes.forEach(function (proc) {
       var key = normName(proc.name, ci);
-      var targets = byName[key];
+      var targets = lookup(proc.name);
       if (!targets) {
         if (!unmatched[key]) unmatched[key] = { name: proc.name, processes: [] };
         unmatched[key].processes.push(proc);
@@ -280,6 +318,11 @@
     unmatchedList.forEach(function (u) {
       warnings.push({ type: 'mpf-unmatched', line: u.processes[0].line, name: u.name, msg: 'MPF: "' + (u.name || '(isimsiz)') + '" FPDF\'de yok (' + u.processes.length + ' proses, ilk satır ' + u.processes[0].line + ')' });
     });
+
+    var sm = Object.keys(suffixMatched);
+    if (sm.length) {
+      warnings.push({ type: 'match-suffix', msg: sm.length + ' MPF ismi FPDF ile sonek üzerinden eşleşti (ör. "' + suffixMatched[sm[0]].from + '" → "' + suffixMatched[sm[0]].to + '")' });
+    }
 
     return { points: fpdf.points, unmatched: unmatchedList, warnings: warnings, summary: summary };
   }

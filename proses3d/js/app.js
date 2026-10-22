@@ -518,7 +518,7 @@
     if (p.processes.length) {
       html += '<div class="muted" style="margin-top:8px">MPF prosesleri</div>';
       p.processes.forEach(function (pr) {
-        html += '<div class="proc"><b>' + esc(pr.code) + '</b> <span class="muted">satır ' + pr.line +
+        html += '<div class="proc"><b>' + esc(pr.code + (pr.args !== '' ? '(' + pr.args + ')' : '')) + '</b> <span class="muted">satır ' + pr.line +
           (pr.blockLine ? ' (pozisyon satır ' + pr.blockLine + ')' : '') + '</span><br><code>' + esc(pr.text) + '</code></div>';
       });
     } else if (!p.inMpf) {
@@ -568,7 +568,7 @@
       var p = pickAt(ev.clientX, ev.clientY);
       if (!p) { tooltip.hidden = true; renderer.domElement.style.cursor = ''; return; }
       renderer.domElement.style.cursor = 'pointer';
-      var procs = p.processes.map(function (x) { return x.code; }).join(', ') || (p.inMpf ? 'proses yok' : 'MPF\'de yok');
+      var procs = p.processes.map(function (x) { return x.code + (x.args !== '' ? '(' + x.args + ')' : ''); }).join(', ') || (p.inMpf ? 'proses yok' : 'MPF\'de yok');
       tooltip.innerHTML = '<div class="t">' + esc(p.name) + '</div>' + esc(procs) +
         '<div class="muted">' + fmt(p.x) + ', ' + fmt(p.y) + ', ' + fmt(p.z) + '</div>';
       var r = viewport.getBoundingClientRect();
@@ -688,7 +688,7 @@
     return {
       'fpdf-short': 'FPDF eksik alan', 'fpdf-coord': 'FPDF koordinat', 'fpdf-noname': 'FPDF isim', 'fpdf-dup': 'FPDF tekrar',
       'mpf-orphan': 'MPF sahipsiz', 'mpf-noname': 'MPF isim', 'mpf-namediff': 'MPF isim farkı', 'mpf-unmatched': 'FPDF\'de yok',
-      'rule-exclusive': 'Kural ihlali'
+      'rule-exclusive': 'Kural ihlali', 'match-suffix': 'Sonek eşleşme'
     }[t] || t;
   }
 
@@ -756,6 +756,7 @@
   function settingsToForm() {
     FORM.forEach(function (f) { $(f[0]).value = state.settings[f[1]][f[2]]; });
     $('cfgCI').checked = state.settings.matchCaseInsensitive;
+    $('cfgSuffix').checked = state.settings.suffixMatch;
   }
   function formToSettings() {
     FORM.forEach(function (f) {
@@ -764,6 +765,7 @@
       state.settings[f[1]][f[2]] = v;
     });
     state.settings.matchCaseInsensitive = $('cfgCI').checked;
+    state.settings.suffixMatch = $('cfgSuffix').checked;
     saveSettings();
   }
   settingsToForm();
