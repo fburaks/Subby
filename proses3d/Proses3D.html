@@ -10621,7 +10621,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
     var excl = Proses.keywordList(state.settings.mpf.exclusiveKeywords);
     var defs = [{ key: 'NONE', label: 'Tekil proses yok', shape: 'circle' }];
     excl.forEach(function (k, i) { defs.push({ key: k, label: k, shape: EXTRA_SHAPES[i % EXTRA_SHAPES.length] }); });
-    defs.push({ key: 'MULTI', label: 'Birden fazla tekil (hata)', shape: 'star' });
+    defs.push({ key: 'MULTI', label: 'Çoklu proses (hatalı)', shape: 'star' });
     defs.push({ key: 'OUT', label: 'MPF\'de yok', shape: 'ring' });
     return defs;
   }
@@ -10634,13 +10634,14 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
   var GRAY = '#5f6b78', RED = '#ff1744', PSEN_COLOR = '#00e676';
 
   // Kategorik şema: noktaları keyOf ile gruplar ve her gruba bir renk verir.
-  // fixed(k) bir renk döndürürse o grup paletten renk almaz.
-  function categorical(keyOf, fixed) {
+  // fixed(k) bir renk döndürürse o grup paletten renk almaz; order verilirse gruplar o sırada listelenir.
+  function categorical(keyOf, fixed, order) {
     var pts = state.result ? state.result.points : [];
     var seen = {};
     pts.forEach(function (p) { var k = keyOf(p); seen[k] = (seen[k] || 0) + 1; });
     var cats = [], map = {}, i = 0;
-    Object.keys(seen).sort(naturalCmp).forEach(function (k) {
+    var rank = function (k) { var r = order ? order.indexOf(k) : -1; return r < 0 ? 999 : r; };
+    Object.keys(seen).sort(function (a, b) { return rank(a) - rank(b) || naturalCmp(a, b); }).forEach(function (k) {
       var col = fixed && fixed(k);
       if (!col) col = PALETTE[i++ % PALETTE.length];
       cats.push(map[k] = { key: k, label: k, color: col, count: seen[k] });
@@ -10648,10 +10649,22 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
     return { cats: cats, map: map, keyOf: keyOf, colorOf: function (p) { var c = map[keyOf(p)]; return c ? c.color : '#ffffff'; } };
   }
 
-  function comboColor(k) {
-    if (k === 'MPF\'de yok') return GRAY;
-    if (k === '(proses yok)') return '#b0bec5';
-    if (k.indexOf('ÇOKLU') >= 0) return RED;
+  // Proses modu: kombinasyon yerine yalnızca tekil proses (CS / DONLY / DNOCLAMP) gösterilir.
+  // PSEN'in yanında tekil proses varsa nokta o tekil prosesle anılır; PSEN harici en az 2 proses hatalıdır.
+  var PROC_PSEN = 'Sadece PSEN', PROC_NONE = '(proses yok)', PROC_MULTI = 'Çoklu proses (hatalı)', PROC_OUT = 'MPF\'de yok';
+  function processKey(p) {
+    if (!p.inMpf) return PROC_OUT;
+    if (p.secondary === 'MULTI') return PROC_MULTI;
+    if (p.secondary !== 'NONE') return p.secondary;
+    return p.hasPsen ? PROC_PSEN : PROC_NONE;
+  }
+  function processColor(k) {
+    return { 'Sadece PSEN': PSEN_COLOR, '(proses yok)': '#b0bec5', 'Çoklu proses (hatalı)': RED, 'MPF\'de yok': GRAY }[k];
+  }
+  function processShapes() {
+    var defs = shapeDefs().filter(function (d) { return d.key !== 'NONE' && d.key !== 'MULTI' && d.key !== 'OUT'; });
+    return [{ key: PROC_PSEN, shape: 'circle' }].concat(defs, [
+      { key: PROC_NONE, shape: 'circle' }, { key: PROC_MULTI, shape: 'star' }, { key: PROC_OUT, shape: 'ring' }]);
   }
 
   var MODES = [
@@ -10676,8 +10689,9 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
         return { scheme: categorical(typeKey), colorTitle: 'Bağlayıcı tipi', shapeLegend: false,
           shapeKeyOf: function () { return 'ALL'; }, shapes: [{ key: 'ALL', shape: 'circle' }] };
       case 'process':
-        return { scheme: categorical(function (p) { return p.combo; }, comboColor), colorTitle: 'Proses kombinasyonu',
-          shapeKeyOf: shapeKeyOf, shapeLegend: true, shapes: shapeDefs() };
+        var shapes = processShapes();
+        return { scheme: categorical(processKey, processColor, shapes.map(function (d) { return d.key; })), colorTitle: 'Proses',
+          shapeKeyOf: processKey, shapeLegend: false, shapes: shapes };
       default: // both
         return { scheme: categorical(typeKey), colorTitle: 'Bağlayıcı tipi', shapeKeyOf: shapeKeyOf, shapeLegend: true, shapes: shapeDefs() };
     }
@@ -11526,7 +11540,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
     } else {
       lines.push({ kind: 'row', big: true, label: 'PSEN olan nokta', value: psenPts });
       lines.push({ kind: 'sec', label: md.colorTitle });
-      colorRows(false);
+      colorRows(state.viewMode === 'process');
     }
     if (md.shapeLegend) {
       lines.push({ kind: 'sec', label: 'Tekil prosesler' });
@@ -11535,11 +11549,15 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
         lines.push({ kind: 'row', label: d.label, value: shapeCounts[d.key] || 0, shape: d.shape, filter: { map: 's', key: d.key } });
       });
     }
+    // Proses modunda "MPF'de yok" ve "Çoklu proses" zaten yukarıdaki listede
+    var inList = state.viewMode === 'process';
     lines.push({ kind: 'sec', label: 'Kontrol' });
-    lines.push({ kind: 'row', label: 'MPF\'de olmayan nokta', value: r.summary.notInMpf, shape: md.shapeLegend ? 'ring' : null,
-      filter: md.shapeLegend ? { map: 's', key: 'OUT' } : null });
+    if (!inList) {
+      lines.push({ kind: 'row', label: 'MPF\'de olmayan nokta', value: r.summary.notInMpf, shape: md.shapeLegend ? 'ring' : null,
+        filter: md.shapeLegend ? { map: 's', key: 'OUT' } : null });
+    }
     lines.push({ kind: 'row', label: 'FPDF\'de olmayan isim', value: r.unmatched.length });
-    if (r.summary.withIssues) {
+    if (r.summary.withIssues && !inList) {
       lines.push({ kind: 'row', label: 'Kural ihlali', value: r.summary.withIssues, shape: 'star', color: RED,
         filter: md.shapeLegend ? { map: 's', key: 'MULTI' } : null });
     }

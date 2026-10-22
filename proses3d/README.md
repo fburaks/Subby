@@ -52,14 +52,14 @@ Harita lejantının üstündeki düğmelerle (veya *Gösterim → Harita modu*) 
 | Mod | Renk | Şekil |
 |---|---|---|
 | **Tip** | Bağlayıcı tipi | Hepsi daire |
-| **Proses** | Proses kombinasyonu (PSEN, PSEN + CS, DONLY ...) | Tekil proses |
+| **Proses** | Tekil proses: CS / DONLY / DNOCLAMP (yanında PSEN olsa da), Sadece PSEN, proses yok, Çoklu proses (hatalı) | Tekil proses |
 | **Tip + Proses** (varsayılan) | Bağlayıcı tipi | Tekil proses |
 | **PSEN** | PSEN var: yeşil büyük yıldız; diğer her şey: küçük gri daire | — |
 
 - Tekil proses şekilleri: daire (yok), kare (CS), üçgen (DONLY), eşkenar dörtgen (DNOCLAMP),
-  yıldız (birden fazla — hata), halka (MPF'de yok).
+  yıldız (çoklu proses — hatalı), halka (MPF'de yok).
+- **Çoklu proses (hatalı)**: PSEN harici en az 2 proses (ör. CS + DONLY veya iki kez DNOCLAMP).
 - Harita lejantındaki satırlara tıklanarak o kategori gizlenip gösterilebilir (paylaşılan haritada da).
-- Lejanttaki kutucuklarla kategoriler gizlenip gösterilebilir.
 - Noktaya tıklayınca sağda detay paneli (MPF satır numaraları ve satır içerikleri), çift tıklayınca odaklanma.
 - Arama kutusu: eşleşen noktalar vurgulanır, Enter ile ilk sonuca gidilir.
 - *Tablo* ve *Uyarılar* panelleri, CSV dışa aktarma (Excel için `;` ayraçlı).
