@@ -77,13 +77,12 @@
     <details open>
       <summary>Gösterim</summary>
       <div class="row">
-        <label>Renklendirme</label>
-        <select id="colorMode">
-          <option value="type" selected>Bağlayıcı tipi</option>
-          <option value="status">Durum (PSEN sayısı)</option>
-          <option value="combo">Proses kombinasyonu</option>
-          <option value="fpdf">FPDF proses kodu</option>
-          <option value="z">Z yüksekliği</option>
+        <label>Harita modu</label>
+        <select id="viewMode">
+          <option value="type">Bağlayıcı tipi</option>
+          <option value="process">Proses tipi</option>
+          <option value="both" selected>Tip + proses</option>
+          <option value="psen">PSEN var / yok</option>
         </select>
       </div>
       <div class="row"><label>Harita başlığı</label><input id="mapTitle" type="text" placeholder="ör. Panel A - Hat 2"></div>

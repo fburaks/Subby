@@ -47,10 +47,18 @@ Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yenide
   *Uyarılar* listesinde gösterilir.
 
 ## Görselleştirme
-- **Şekil** = tekil proses: daire (yok), kare (CS), üçgen (DONLY), eşkenar dörtgen (DNOCLAMP),
+Harita lejantının üstündeki düğmelerle (veya *Gösterim → Harita modu*) dört görünüm seçilir:
+
+| Mod | Renk | Şekil |
+|---|---|---|
+| **Tip** | Bağlayıcı tipi | Hepsi daire |
+| **Proses** | Proses kombinasyonu (PSEN, PSEN + CS, DONLY ...) | Tekil proses |
+| **Tip + Proses** (varsayılan) | Bağlayıcı tipi | Tekil proses |
+| **PSEN** | PSEN var: yeşil büyük yıldız; diğer her şey: küçük gri daire | — |
+
+- Tekil proses şekilleri: daire (yok), kare (CS), üçgen (DONLY), eşkenar dörtgen (DNOCLAMP),
   yıldız (birden fazla — hata), halka (MPF'de yok).
-- **Renk** = varsayılan olarak bağlayıcı tipi; ayrıca durum (PSEN var/yok / kural ihlali),
-  proses kombinasyonu, FPDF proses kodu, Z yüksekliği seçilebilir.
+- Harita lejantındaki satırlara tıklanarak o kategori gizlenip gösterilebilir (paylaşılan haritada da).
 - Lejanttaki kutucuklarla kategoriler gizlenip gösterilebilir.
 - Noktaya tıklayınca sağda detay paneli (MPF satır numaraları ve satır içerikleri), çift tıklayınca odaklanma.
 - Arama kutusu: eşleşen noktalar vurgulanır, Enter ile ilk sonuca gidilir.

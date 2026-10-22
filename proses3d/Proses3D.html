@@ -88,7 +88,7 @@ code { background: var(--panel-2); padding: 0 4px; border-radius: 3px; }
 #stats { position: absolute; left: 10px; bottom: 10px; color: var(--muted); font-size: 12px; z-index: 4;
   background: rgba(15,20,25,.75); padding: 6px 10px; border-radius: 4px; line-height: 1.5; pointer-events: none; }
 #stats b { color: var(--text); }
-#summary { position: absolute; left: 10px; top: 52px; z-index: 7; min-width: 210px; max-width: 300px; max-height: calc(100% - 170px); overflow: auto;
+#summary { position: absolute; left: 10px; top: 52px; z-index: 7; min-width: 250px; max-width: 320px; max-height: calc(100% - 170px); overflow: auto;
   background: rgba(23,30,38,.92); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font-size: 12px; }
 #summary h4 { margin: 0 0 2px; font-size: 14px; }
 #summary .meta { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
@@ -98,6 +98,14 @@ code { background: var(--panel-2); padding: 0 4px; border-radius: 3px; }
 #summary .ln .v { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; padding-left: 12px; }
 #summary .ln.big { font-size: 13px; }
 #summary .ln.big .v { color: #66bb6a; }
+#summary .ln.click { cursor: pointer; border-radius: 3px; }
+#summary .ln.click:hover { background: rgba(255,255,255,.06); }
+#summary .ln.off { opacity: .35; }
+#summary .modes { display: flex; gap: 3px; margin: 2px 0 8px; }
+#summary .modes button { flex: 1 1 auto; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  border-radius: 4px; padding: 3px 6px; font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
+#summary .modes button:hover { color: var(--text); }
+#summary .modes button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 #tooltip { position: absolute; z-index: 20; pointer-events: none; background: rgba(23,30,38,.95); border: 1px solid var(--line);
   border-radius: 4px; padding: 6px 8px; font-size: 12px; max-width: 280px; white-space: nowrap; }
 #tooltip .t { font-weight: 600; }
@@ -222,13 +230,12 @@ body.viewer #info { top: 52px; }
     <details open>
       <summary>Gösterim</summary>
       <div class="row">
-        <label>Renklendirme</label>
-        <select id="colorMode">
-          <option value="type" selected>Bağlayıcı tipi</option>
-          <option value="status">Durum (PSEN sayısı)</option>
-          <option value="combo">Proses kombinasyonu</option>
-          <option value="fpdf">FPDF proses kodu</option>
-          <option value="z">Z yüksekliği</option>
+        <label>Harita modu</label>
+        <select id="viewMode">
+          <option value="type">Bağlayıcı tipi</option>
+          <option value="process">Proses tipi</option>
+          <option value="both" selected>Tip + proses</option>
+          <option value="psen">PSEN var / yok</option>
         </select>
       </div>
       <div class="row"><label>Harita başlığı</label><input id="mapTitle" type="text" placeholder="ör. Panel A - Hat 2"></div>
@@ -10533,6 +10540,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
     names: { fpdf: '', mpf: '' },
     fpdf: null, mpf: null, result: null,
     warnings: [],
+    viewMode: 'both',     // type | process | both | psen
     hiddenShapes: {}, hiddenColors: {},
     selected: null,
     visible: [],          // ekranda çizilen noktalar (seçim için)
@@ -10619,63 +10627,74 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
   }
   function shapeKeyOf(pt) { return pt.inMpf ? pt.secondary : 'OUT'; }
 
-  // ------------------------------------------------------------------ renkler
-  var PALETTE = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#76b7b2', '#edc948', '#b07aa1', '#ff9da7',
+  // ------------------------------------------------------------------ renkler ve harita modları
+  // Kırmızı tonları kural ihlaline ayrıldığı için palette yok
+  var PALETTE = ['#4e79a7', '#f28e2b', '#59a14f', '#76b7b2', '#edc948', '#b07aa1', '#ff9da7',
     '#9c755f', '#bab0ac', '#17becf', '#bcbd22', '#8c564b', '#e377c2', '#1f77b4', '#2ca02c'];
-  var STATUS = [
-    { key: 'out', label: 'MPF\'de yok', color: '#5f6b78' },
-    { key: 'p0', label: 'PSEN yok', color: '#29b6f6' },
-    { key: 'p1', label: 'PSEN var', color: '#66bb6a' },
-    { key: 'err', label: 'Kural ihlali', color: '#ff1744' }
-  ];
+  var GRAY = '#5f6b78', RED = '#ff1744', PSEN_COLOR = '#00e676';
 
-  function statusKey(pt) {
-    if (pt.issues.length) return 'err';
-    if (!pt.inMpf) return 'out';
-    return pt.hasPsen ? 'p1' : 'p0';
-  }
-
-  // Seçili moda göre {key -> {label,color,count}} kategori listesi ve nokta->anahtar fonksiyonu
-  function colorScheme() {
-    var mode = $('colorMode').value;
+  // Kategorik şema: noktaları keyOf ile gruplar ve her gruba bir renk verir.
+  // fixed(k) bir renk döndürürse o grup paletten renk almaz.
+  function categorical(keyOf, fixed) {
     var pts = state.result ? state.result.points : [];
-    var cats = [], keyOf;
-    if (mode === 'status') {
-      keyOf = statusKey;
-      cats = STATUS.map(function (s) { return { key: s.key, label: s.label, color: s.color }; });
-    } else if (mode === 'combo' || mode === 'fpdf' || mode === 'type') {
-      keyOf = mode === 'combo' ? function (p) { return p.combo; }
-        : mode === 'type' ? function (p) { return p.type || '(boş)'; }
-        : function (p) { return p.fpdfProc || '(boş)'; };
-      var seen = {};
-      pts.forEach(function (p) { var k = keyOf(p); seen[k] = (seen[k] || 0) + 1; });
-      Object.keys(seen).sort(naturalCmp).forEach(function (k, i) {
-        var col = PALETTE[i % PALETTE.length];
-        if (mode === 'combo' && k === 'MPF\'de yok') col = '#5f6b78';
-        if (mode === 'combo' && k.indexOf('ÇOKLU') >= 0) col = '#ff1744';
-        cats.push({ key: k, label: k, color: col });
-      });
-    } else { // z
-      var zmin = Infinity, zmax = -Infinity;
-      pts.forEach(function (p) { if (p.z < zmin) zmin = p.z; if (p.z > zmax) zmax = p.z; });
-      return { continuous: true, zmin: zmin, zmax: zmax, keyOf: function () { return 'z'; },
-        colorOf: function (p) { return rampColor(zmax > zmin ? (p.z - zmin) / (zmax - zmin) : 0.5); } };
-    }
-    var map = {};
-    cats.forEach(function (c) { c.count = 0; map[c.key] = c; });
-    pts.forEach(function (p) { var c = map[keyOf(p)]; if (c) c.count++; });
+    var seen = {};
+    pts.forEach(function (p) { var k = keyOf(p); seen[k] = (seen[k] || 0) + 1; });
+    var cats = [], map = {}, i = 0;
+    Object.keys(seen).sort(naturalCmp).forEach(function (k) {
+      var col = fixed && fixed(k);
+      if (!col) col = PALETTE[i++ % PALETTE.length];
+      cats.push(map[k] = { key: k, label: k, color: col, count: seen[k] });
+    });
     return { cats: cats, map: map, keyOf: keyOf, colorOf: function (p) { var c = map[keyOf(p)]; return c ? c.color : '#ffffff'; } };
   }
 
-  function rampColor(t) { // mavi -> camgöbeği -> yeşil -> sarı -> kırmızı
-    var stops = [[0, [49, 54, 149]], [0.25, [69, 160, 220]], [0.5, [102, 189, 99]], [0.75, [253, 204, 72]], [1, [215, 48, 39]]];
-    for (var i = 1; i < stops.length; i++) {
-      if (t <= stops[i][0]) {
-        var a = stops[i - 1], b = stops[i], f = (t - a[0]) / (b[0] - a[0]);
-        return 'rgb(' + [0, 1, 2].map(function (j) { return Math.round(a[1][j] + (b[1][j] - a[1][j]) * f); }).join(',') + ')';
-      }
+  function comboColor(k) {
+    if (k === 'MPF\'de yok') return GRAY;
+    if (k === '(proses yok)') return '#b0bec5';
+    if (k.indexOf('ÇOKLU') >= 0) return RED;
+  }
+
+  var MODES = [
+    { key: 'type', label: 'Bağlayıcı tipi', short: 'Tip' },
+    { key: 'process', label: 'Proses tipi', short: 'Proses' },
+    { key: 'both', label: 'Tip + proses', short: 'Tip + Proses' },
+    { key: 'psen', label: 'PSEN var / yok', short: 'PSEN' }
+  ];
+
+  // Harita modu: renk şeması, şekiller ve şekil filtresinin kullanılıp kullanılmayacağı
+  function modeDef() {
+    var typeKey = function (p) { return p.type || '(boş)'; };
+    switch (state.viewMode) {
+      case 'psen':
+        // PSEN noktaları belirgin (yeşil, büyük yıldız); geri kalan her şey aynı küçük gri daire
+        var pk = function (p) { return p.hasPsen ? 'PSEN' : 'YOK'; };
+        var sc = categorical(pk, function (k) { return k === 'PSEN' ? PSEN_COLOR : GRAY; });
+        sc.cats.forEach(function (c) { c.label = c.key === 'PSEN' ? 'PSEN var' : 'PSEN yok'; });
+        return { scheme: sc, colorTitle: 'PSEN', shapeKeyOf: pk, shapeLegend: false,
+          shapes: [{ key: 'PSEN', label: 'PSEN var', shape: 'star', size: 1.5, order: 2 }, { key: 'YOK', label: 'PSEN yok', shape: 'circle', size: 0.6 }] };
+      case 'type':
+        return { scheme: categorical(typeKey), colorTitle: 'Bağlayıcı tipi', shapeLegend: false,
+          shapeKeyOf: function () { return 'ALL'; }, shapes: [{ key: 'ALL', shape: 'circle' }] };
+      case 'process':
+        return { scheme: categorical(function (p) { return p.combo; }, comboColor), colorTitle: 'Proses kombinasyonu',
+          shapeKeyOf: shapeKeyOf, shapeLegend: true, shapes: shapeDefs() };
+      default: // both
+        return { scheme: categorical(typeKey), colorTitle: 'Bağlayıcı tipi', shapeKeyOf: shapeKeyOf, shapeLegend: true, shapes: shapeDefs() };
     }
-    return 'rgb(215,48,39)';
+  }
+
+  function setViewMode(m) {
+    state.viewMode = m;
+    $('viewMode').value = m;
+    state.hiddenColors = {};
+    buildLegend(); rebuildPoints(); updateStats(); renderSummary();
+    if (state.drawerMode) renderDrawer();
+  }
+
+  // Lejant / özet filtrelerinden sonra yeniden çiz
+  function refreshFilters() {
+    buildLegend(); rebuildPoints(); updateStats(); renderSummary();
+    if (state.drawerMode === 'table') renderDrawer();
   }
 
   function naturalCmp(a, b) { return String(a).localeCompare(String(b), 'tr', { numeric: true, sensitivity: 'base' }); }
@@ -10773,19 +10792,19 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
     state.visible = [];
     if (!state.result) { state.visiblePos = null; return; }
 
-    var scheme = colorScheme();
+    var md = modeDef(), scheme = md.scheme;
     var size = +$('ptSize').value;
     var onTop = $('chkOnTop').checked;
     var groups = {};
     var col = new THREE.Color();
     state.result.points.forEach(function (p) {
-      var sk = shapeKeyOf(p);
-      if (state.hiddenShapes[sk]) return;
-      if (!scheme.continuous && state.hiddenColors[scheme.keyOf(p)]) return;
+      var sk = md.shapeKeyOf(p);
+      if (md.shapeLegend && state.hiddenShapes[sk]) return;
+      if (state.hiddenColors[scheme.keyOf(p)]) return;
       (groups[sk] = groups[sk] || []).push(p);
     });
-    var defs = shapeDefs(), shapeOf = {};
-    defs.forEach(function (d) { shapeOf[d.key] = d.shape; });
+    var defOf = {};
+    md.shapes.forEach(function (d) { defOf[d.key] = d; });
 
     Object.keys(groups).forEach(function (sk) {
       var list = groups[sk];
@@ -10800,11 +10819,12 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
       g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
       var m = new THREE.PointsMaterial({
-        size: size, sizeAttenuation: false, map: shapeTexture(shapeOf[sk] || 'circle'),
+        size: size * ((defOf[sk] && defOf[sk].size) || 1), sizeAttenuation: false,
+        map: shapeTexture((defOf[sk] && defOf[sk].shape) || 'circle'),
         vertexColors: true, alphaTest: 0.5, depthTest: !onTop
       });
       var pts = new THREE.Points(g, m);
-      pts.renderOrder = onTop ? 5 : 0;
+      pts.renderOrder = (onTop ? 5 : 0) + ((defOf[sk] && defOf[sk].order) || 0);
       pointGroup.add(pts);
     });
 
@@ -10937,36 +10957,25 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
   function buildLegend() {
     var ls = $('legendShape'), lc = $('legendColor');
     ls.innerHTML = ''; lc.innerHTML = '';
+    var md = modeDef();
     var pts = state.result ? state.result.points : [];
-    var counts = {};
-    pts.forEach(function (p) { var k = shapeKeyOf(p); counts[k] = (counts[k] || 0) + 1; });
-
-    addTitle(ls, 'Şekil: tekil proses');
-    shapeDefs().forEach(function (d) {
-      if (!counts[d.key] && (d.key === 'MULTI' || d.key === 'OUT')) return;
-      ls.appendChild(legendItem(legendCanvas(d.shape, '#c9d3de'), d.label, counts[d.key] || 0, state.hiddenShapes, d.key));
-    });
-
-    var scheme = colorScheme();
-    addTitle(lc, 'Renk: ' + $('colorMode').selectedOptions[0].textContent);
-    if (scheme.continuous) {
-      var bar = document.createElement('div');
-      bar.style.cssText = 'height:12px;border-radius:3px;background:linear-gradient(90deg,' +
-        [0, .25, .5, .75, 1].map(rampColor).join(',') + ')';
-      lc.appendChild(bar);
-      var lbl = document.createElement('div');
-      lbl.className = 'muted';
-      lbl.style.cssText = 'display:flex;justify-content:space-between;font-size:11px';
-      lbl.innerHTML = '<span>' + fmt(scheme.zmin) + '</span><span>Z</span><span>' + fmt(scheme.zmax) + '</span>';
-      lc.appendChild(lbl);
-      return;
+    if (md.shapeLegend) {
+      var counts = {};
+      pts.forEach(function (p) { var k = md.shapeKeyOf(p); counts[k] = (counts[k] || 0) + 1; });
+      addTitle(ls, 'Şekil: tekil proses');
+      md.shapes.forEach(function (d) {
+        if (!counts[d.key] && (d.key === 'MULTI' || d.key === 'OUT')) return;
+        ls.appendChild(legendItem(legendCanvas(d.shape, '#c9d3de'), d.label, counts[d.key] || 0, state.hiddenShapes, d.key));
+      });
     }
-    scheme.cats.forEach(function (c) {
-      if (!c.count && $('colorMode').value === 'status' && c.key === 'err') return;
-      var sw = document.createElement('span');
-      sw.className = 'sw';
-      sw.style.background = c.color;
-      lc.appendChild(legendItem(sw, c.label, c.count, state.hiddenColors, c.key));
+    addTitle(lc, 'Renk: ' + md.colorTitle);
+    var shapeOf = {};
+    if (!md.shapeLegend) md.shapes.forEach(function (d) { shapeOf[d.key] = d.shape; });
+    md.scheme.cats.forEach(function (c) {
+      var icon;
+      if (shapeOf[c.key]) icon = legendCanvas(shapeOf[c.key], c.color);
+      else { icon = document.createElement('span'); icon.className = 'sw'; icon.style.background = c.color; }
+      lc.appendChild(legendItem(icon, c.label, c.count, state.hiddenColors, c.key));
     });
   }
 
@@ -10980,9 +10989,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
     l.className = cb.checked ? '' : 'off';
     cb.onchange = function () {
       if (cb.checked) delete hiddenMap[key]; else hiddenMap[key] = true;
-      l.className = cb.checked ? '' : 'off';
-      rebuildPoints(); updateStats();
-      if (state.drawerMode === 'table') renderDrawer();
+      refreshFilters();
     };
     var t = document.createElement('span'); t.textContent = label;
     var n = document.createElement('span'); n.className = 'cnt'; n.textContent = count;
@@ -11163,7 +11170,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
         return (typeof va === 'number' ? va - vb : naturalCmp(va, vb)) * dir;
       });
       $('drawerInfo').textContent = rows.length + ' satır' + (rows.length > LIMIT ? ' (ilk ' + LIMIT + ' gösteriliyor)' : '');
-      var scheme = colorScheme();
+      var scheme = modeDef().scheme;
       var html = '<table><thead><tr>' + COLS.map(function (c) {
         return '<th data-k="' + c.key + '">' + c.label + (sk === c.key ? (dir > 0 ? ' ▲' : ' ▼') : '') + '</th>';
       }).join('') + '</tr></thead><tbody>';
@@ -11308,7 +11315,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
   }
 
   // ------------------------------------------------------------------ gösterim kontrolleri
-  $('colorMode').onchange = function () { state.hiddenColors = {}; buildLegend(); rebuildPoints(); updateStats(); renderSummary(); if (state.drawerMode) renderDrawer(); };
+  $('viewMode').onchange = function () { setViewMode(this.value); };
   $('chkSummary').onchange = renderSummary;
   $('mapTitle').addEventListener('input', renderSummary);
   $('ptSize').oninput = function () {
@@ -11490,56 +11497,94 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
   // Harita üzerindeki özet: bağlayıcı tipleri, toplamlar ve PSEN sayıları.
   // Aynı satır listesi hem HTML panelde hem PNG çıktısında kullanılır.
   function summaryLines() {
-    var r = state.result, pts = r.points;
-    var types = {}, psenPts = 0, excl = {};
+    var r = state.result, pts = r.points, md = modeDef();
+    var psenPts = 0, shapeCounts = {};
     pts.forEach(function (p) {
-      var t = p.type || '(boş)';
-      types[t] = (types[t] || 0) + 1;
       if (p.hasPsen) psenPts++;
-      p.exclusive.filter(function (c, i, a) { return a.indexOf(c) === i; }).forEach(function (c) { excl[c] = (excl[c] || 0) + 1; });
+      var k = shapeKeyOf(p);
+      shapeCounts[k] = (shapeCounts[k] || 0) + 1;
     });
-    var typeColors = $('colorMode').value === 'type' ? colorScheme() : null;
-    var defs = shapeDefs(), lines = [];
+    var lines = [];
     var meta = [state.names.fpdf, state.names.mpf].filter(Boolean).join(' · ');
     var when = state.shared ? new Date(state.shared.created) : new Date();
+    var modeLabel = MODES.filter(function (m) { return m.key === state.viewMode; })[0].label;
     lines.push({ kind: 'title', label: $('mapTitle').value.trim() || 'Proses haritası' });
     lines.push({ kind: 'meta', label: (meta ? meta + ' · ' : '') + when.toLocaleDateString('tr-TR') });
+    lines.push({ kind: 'modes', label: 'Görünüm: ' + modeLabel });
     lines.push({ kind: 'row', label: 'Toplam bağlayıcı', value: pts.length });
-    lines.push({ kind: 'row', big: true, label: 'PSEN olan nokta', value: psenPts });
-    lines.push({ kind: 'sec', label: 'Bağlayıcı tipleri' });
-    Object.keys(types).sort(naturalCmp).forEach(function (t) {
-      lines.push({ kind: 'row', label: t, value: types[t], color: typeColors && typeColors.map[t] ? typeColors.map[t].color : null });
-    });
-    lines.push({ kind: 'sec', label: 'Tekil prosesler (nokta)' });
-    defs.forEach(function (d) {
-      if (d.key === 'NONE' || d.key === 'MULTI' || d.key === 'OUT') return;
-      lines.push({ kind: 'row', label: d.label, value: excl[d.key] || 0, shape: d.shape });
-    });
+
+    var colorRows = function (withShapes) {
+      var shapeOf = {};
+      if (withShapes) md.shapes.forEach(function (d) { shapeOf[d.key] = d.shape; });
+      md.scheme.cats.forEach(function (c) {
+        lines.push({ kind: 'row', label: c.label, value: c.count, color: c.color, shape: shapeOf[c.key], filter: { map: 'c', key: c.key } });
+      });
+    };
+    if (state.viewMode === 'psen') {
+      lines.push({ kind: 'sec', label: 'PSEN' });
+      colorRows(true);
+    } else {
+      lines.push({ kind: 'row', big: true, label: 'PSEN olan nokta', value: psenPts });
+      lines.push({ kind: 'sec', label: md.colorTitle });
+      colorRows(false);
+    }
+    if (md.shapeLegend) {
+      lines.push({ kind: 'sec', label: 'Tekil prosesler' });
+      md.shapes.forEach(function (d) {
+        if (d.key === 'MULTI' || d.key === 'OUT') return;
+        lines.push({ kind: 'row', label: d.label, value: shapeCounts[d.key] || 0, shape: d.shape, filter: { map: 's', key: d.key } });
+      });
+    }
     lines.push({ kind: 'sec', label: 'Kontrol' });
-    lines.push({ kind: 'row', label: 'MPF\'de olmayan nokta', value: r.summary.notInMpf, shape: 'ring' });
+    lines.push({ kind: 'row', label: 'MPF\'de olmayan nokta', value: r.summary.notInMpf, shape: md.shapeLegend ? 'ring' : null,
+      filter: md.shapeLegend ? { map: 's', key: 'OUT' } : null });
     lines.push({ kind: 'row', label: 'FPDF\'de olmayan isim', value: r.unmatched.length });
-    if (r.summary.withIssues) lines.push({ kind: 'row', label: 'Kural ihlali', value: r.summary.withIssues, shape: 'star', color: '#ff1744' });
+    if (r.summary.withIssues) {
+      lines.push({ kind: 'row', label: 'Kural ihlali', value: r.summary.withIssues, shape: 'star', color: RED,
+        filter: md.shapeLegend ? { map: 's', key: 'MULTI' } : null });
+    }
+    lines.forEach(function (l) {
+      if (l.filter) l.off = !!(l.filter.map === 'c' ? state.hiddenColors : state.hiddenShapes)[l.filter.key];
+    });
     return lines;
   }
 
   function renderSummary() {
     var el = $('summary');
     if (!state.result || !$('chkSummary').checked) { el.hidden = true; return; }
-    var html = '';
+    var html = '', filters = [];
     summaryLines().forEach(function (l) {
       if (l.kind === 'title') html += '<h4>' + esc(l.label) + '</h4>';
       else if (l.kind === 'meta') html += '<div class="meta">' + esc(l.label) + '</div>';
       else if (l.kind === 'sec') html += '<div class="sec">' + esc(l.label) + '</div>';
-      else {
+      else if (l.kind === 'modes') {
+        html += '<div class="modes">' + MODES.map(function (m) {
+          return '<button data-mode="' + m.key + '" class="' + (m.key === state.viewMode ? 'on' : '') + '" title="' + esc(m.label) + '">' + esc(m.short) + '</button>';
+        }).join('') + '</div>';
+      } else {
         var icon = l.shape ? '<canvas data-shape="' + l.shape + '" data-color="' + (l.color || '#c9d3de') + '"></canvas>'
           : l.color ? '<span class="sw" style="background:' + l.color + '"></span>' : '';
-        html += '<div class="ln' + (l.big ? ' big' : '') + '">' + icon + '<span>' + esc(l.label) + '</span><span class="v">' + l.value + '</span></div>';
+        var attr = '';
+        if (l.filter) { attr = ' data-f="' + filters.length + '" title="Göster / gizle"'; filters.push(l.filter); }
+        html += '<div class="ln' + (l.big ? ' big' : '') + (l.filter ? ' click' : '') + (l.off ? ' off' : '') + '"' + attr + '>' +
+          icon + '<span>' + esc(l.label) + '</span><span class="v">' + l.value + '</span></div>';
       }
     });
     el.innerHTML = html;
     el.querySelectorAll('canvas[data-shape]').forEach(function (cv) {
       cv.width = cv.height = 26;
       drawShape(cv, cv.getAttribute('data-shape'), cv.getAttribute('data-color'), 'rgba(0,0,0,.8)');
+    });
+    el.querySelectorAll('[data-mode]').forEach(function (b) {
+      b.onclick = function () { setViewMode(b.getAttribute('data-mode')); };
+    });
+    el.querySelectorAll('[data-f]').forEach(function (row) {
+      row.onclick = function () {
+        var f = filters[+row.getAttribute('data-f')];
+        var map = f.map === 'c' ? state.hiddenColors : state.hiddenShapes;
+        if (map[f.key]) delete map[f.key]; else map[f.key] = true;
+        refreshFilters();
+      };
     });
     el.hidden = false;
   }
@@ -11549,7 +11594,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
     var lines = summaryLines();
     var pad = 12 * pr, lh = 18 * pr, w = 0, h = pad * 2;
     var font = function (l) {
-      return (l.kind === 'title' ? '600 ' + 15 * pr : l.big ? '600 ' + 13 * pr : (l.kind === 'meta' || l.kind === 'sec' ? 11 : 12) * pr) + 'px "Segoe UI", sans-serif';
+      return (l.kind === 'title' ? '600 ' + 15 * pr : l.big ? '600 ' + 13 * pr : (l.kind === 'row' ? 12 : 11) * pr) + 'px "Segoe UI", sans-serif';
     };
     lines.forEach(function (l) {
       c.font = font(l);
@@ -11569,8 +11614,9 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
       if (l.kind === 'sec') y += lh * 0.3;
       c.font = font(l);
       c.textBaseline = 'middle';
+      c.globalAlpha = l.off ? 0.35 : 1;
       var cy = y + lh / 2, x = x0 + pad;
-      c.fillStyle = l.kind === 'meta' || l.kind === 'sec' ? '#8796a8' : '#dbe3ec';
+      c.fillStyle = l.kind === 'meta' || l.kind === 'sec' || l.kind === 'modes' ? '#8796a8' : '#dbe3ec';
       if (l.kind === 'row') {
         var s = 12 * pr;
         if (l.shape) {
@@ -11595,6 +11641,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
       }
       y += lh;
     });
+    c.globalAlpha = 1;
   }
 
   $('btnPng').onclick = function () {
@@ -11625,7 +11672,7 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
     return t.replace(/[\\/:*?"<>|]+/g, '_') + '_harita';
   }
 
-  var VIEW_INPUTS = ['colorMode', 'ptSize', 'chkAxes', 'chkOnTop', 'chkLabels', 'chkSummary', 'mapTitle',
+  var VIEW_INPUTS = ['viewMode', 'ptSize', 'chkAxes', 'chkOnTop', 'chkLabels', 'chkSummary', 'mapTitle',
     'mdlColor', 'mdlOpacity', 'mdlWire', 'mdlVisible', 'mdlTx', 'mdlTy', 'mdlTz', 'mdlRx', 'mdlRy', 'mdlRz', 'mdlScale'];
 
   function collectShare() {
@@ -11677,6 +11724,8 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
       if (el.type === 'checkbox') el.checked = !!inputs[id]; else el.value = inputs[id];
     });
     $('ptSizeVal').textContent = $('ptSize').value;
+    state.viewMode = MODES.some(function (m) { return m.key === $('viewMode').value; }) ? $('viewMode').value : 'both';
+    $('viewMode').value = state.viewMode;
     helpers.visible = $('chkAxes').checked;
     state.text.fpdf = d.fpdf || '';
     state.text.mpf = d.mpf || '';
