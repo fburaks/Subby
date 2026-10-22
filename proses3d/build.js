@@ -15,6 +15,12 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, function (_, src) {
   var js = fs.readFileSync(path.join(dir, src), 'utf8').replace(/<\/script/gi, '<\\/script');
   return '<script>/* ' + src + ' */\n' + js + '\n</script>';
 });
+// CATIA Python betiği düz metin olarak gömülür ("CATIA Python betiği" düğmesi indirir)
+html = html.replace(/<script type="text\/plain" id="([^"]+)" data-src="([^"]+)"><\/script>/g, function (_, id, src) {
+  var txt = fs.readFileSync(path.join(dir, src), 'utf8');
+  if (/<\/script/i.test(txt)) throw new Error(src + ' içinde </script> olamaz');
+  return '<script type="text/plain" id="' + id + '">\n' + txt + '</script>';
+});
 if (inlined !== expected) throw new Error('Gömülemeyen kaynak kaldı');
 
 var out = path.join(dir, 'Proses3D.html');

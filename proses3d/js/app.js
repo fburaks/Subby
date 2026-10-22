@@ -134,7 +134,7 @@
 
   // Proses modu: kombinasyon yerine yalnızca tekil proses (CS / DONLY / DNOCLAMP) gösterilir.
   // PSEN'in yanında tekil proses varsa nokta o tekil prosesle anılır; PSEN harici en az 2 proses hatalıdır.
-  var PROC_PSEN = 'Sadece PSEN', PROC_NONE = '(proses yok)', PROC_MULTI = 'Çoklu proses (hatalı)', PROC_OUT = 'MPF\'de yok';
+  var PROC_PSEN = 'PSEN', PROC_NONE = '(proses yok)', PROC_MULTI = 'Çoklu proses (hatalı)', PROC_OUT = 'MPF\'de yok';
   function processKey(p) {
     if (!p.inMpf) return PROC_OUT;
     if (p.secondary === 'MULTI') return PROC_MULTI;
@@ -142,7 +142,7 @@
     return p.hasPsen ? PROC_PSEN : PROC_NONE;
   }
   function processColor(k) {
-    return { 'Sadece PSEN': PSEN_COLOR, '(proses yok)': '#b0bec5', 'Çoklu proses (hatalı)': RED, 'MPF\'de yok': GRAY }[k];
+    return { 'PSEN': PSEN_COLOR, '(proses yok)': '#b0bec5', 'Çoklu proses (hatalı)': RED, 'MPF\'de yok': GRAY }[k];
   }
   function processShapes() {
     var defs = shapeDefs().filter(function (d) { return d.key !== 'NONE' && d.key !== 'MULTI' && d.key !== 'OUT'; });
@@ -1251,6 +1251,48 @@
     } else setView('iso');
     document.title = ($('mapTitle').value.trim() || 'Proses haritası') + ' - Proses 3D';
   }
+
+  // ------------------------------------------------------------------ CATIA aktarımı
+  // Haritada görünen noktalar, o anki modun renk ve şekilleriyle CSV'ye yazılır;
+  // catia/proses3d_catia.py bu dosyayı okuyup CATIA'da geometrik setler halinde oluşturur.
+  var CATIA_PROC = { 'PSEN': 'PSEN', '(proses yok)': 'PROSESYOK', 'Çoklu proses (hatalı)': 'COKLU', 'MPF\'de yok': 'MPFYOK' };
+
+  function hexRgb(c) {
+    var col = new THREE.Color(c);
+    return [Math.round(col.r * 255), Math.round(col.g * 255), Math.round(col.b * 255)];
+  }
+
+  $('btnCatiaCsv').onclick = function () {
+    if (!state.result) { alert('Önce FPDF dosyasını yükleyin.'); return; }
+    var md = modeDef(), defOf = {};
+    md.shapes.forEach(function (d) { defOf[d.key] = d; });
+    var title = $('mapTitle').value.trim() || baseName();
+    var rows = [['Ad', 'X', 'Y', 'Z', 'R', 'G', 'B', 'Sekil', 'Grup', 'Baglayici', 'Tip', 'Proses', 'Harita']];
+    // Grupları lejant sırasına göre diz
+    var catOrder = {}, shapeOrder = {};
+    md.scheme.cats.forEach(function (c, i) { catOrder[c.key] = i; });
+    md.shapes.forEach(function (d, i) { shapeOrder[d.key] = i; });
+    var pts = state.visible.slice().sort(function (a, b) {
+      return (catOrder[md.scheme.keyOf(a)] - catOrder[md.scheme.keyOf(b)]) ||
+        (shapeOrder[md.shapeKeyOf(a)] - shapeOrder[md.shapeKeyOf(b)]) || naturalCmp(a.name, b.name);
+    });
+    pts.forEach(function (p) {
+      var pk = processKey(p), proc = CATIA_PROC[pk] || pk;
+      var ck = md.scheme.keyOf(p), cat = md.scheme.map[ck], sk = md.shapeKeyOf(p);
+      var def = defOf[sk] || { shape: 'circle', label: sk };
+      var group = cat.label + (md.shapeLegend ? ' - ' + (def.label || sk) : '');
+      var rgb = hexRgb(cat.color);
+      rows.push([p.name + '-' + (p.type || 'TIPYOK') + '-' + proc, p.x, p.y, p.z, rgb[0], rgb[1], rgb[2],
+        def.shape, group, p.name, p.type, proc, title]);
+    });
+    download(shareName() + '_catia.csv', '\uFEFF' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'), 'text/csv');
+  };
+
+  $('btnCatiaPy').onclick = function () {
+    var src = $('catiaPy').textContent;
+    if (!src.trim()) { alert('Python betiği bu sürümde gömülü değil; Proses3D.html kullanın veya catia/proses3d_catia.py dosyasını alın.'); return; }
+    download('proses3d_catia.py', src.replace(/^\n/, ''), 'text/x-python');
+  };
 
   // ------------------------------------------------------------------ başlat
   resize();

@@ -52,7 +52,7 @@ Harita lejantının üstündeki düğmelerle (veya *Gösterim → Harita modu*) 
 | Mod | Renk | Şekil |
 |---|---|---|
 | **Tip** | Bağlayıcı tipi | Hepsi daire |
-| **Proses** | Tekil proses: CS / DONLY / DNOCLAMP (yanında PSEN olsa da), Sadece PSEN, proses yok, Çoklu proses (hatalı) | Tekil proses |
+| **Proses** | PSEN (yalnızca PSEN olanlar); CS / DONLY / DNOCLAMP (yanında PSEN olsa da o tekil proses sayılır); proses yok; Çoklu proses (hatalı) | Tekil proses |
 | **Tip + Proses** (varsayılan) | Bağlayıcı tipi | Tekil proses |
 | **PSEN** | PSEN var: yeşil büyük yıldız; diğer her şey: küçük gri daire | — |
 
@@ -82,6 +82,22 @@ CGR kapalı bir format olduğu için doğrudan okunamaz. CATIA'dan:
   Bu özellik yalnızca `Proses3D.html` sürümünde çalışır.
 - **Görüntü (PNG)**: o anki görünüm + özet lejantı.
 - **CSV**: nokta listesi ve uyarılar.
+
+## CATIA'ya aktarma
+1. Haritayı istenen moda getirin (gizlenen kategoriler aktarılmaz).
+2. *Kaydet / Paylaş → CATIA CSV* ile `..._catia.csv`, *CATIA Python betiği* ile `proses3d_catia.py` indirin.
+3. CATIA V5'te hedef CATPart'ı açın ve Windows'ta çalıştırın (Python 3 + `pip install pywin32`):
+   ```
+   python proses3d_catia.py Panel_A_harita_catia.csv          (aktif Part'a)
+   python proses3d_catia.py Panel_A_harita_catia.csv --yeni   (yeni Part'a)
+   ```
+4. Sonuç: `Proses3D_<başlık>` geometrik seti, içinde her renk/sembol grubu için bir alt set.
+   Nokta adları `<nokta adı>-<bağlayıcı tipi>-<proses>` (ör. `Point_No--Fst-1962-P20-CS`).
+   Proses değerleri: PSEN, CS, DONLY, DNOCLAMP, PROSESYOK, COKLU, MPFYOK.
+
+CATIA'nın sembol numaraları (SetSymbolType) sürüme göre farklı olabilir:
+`python proses3d_catia.py --sembol-testi` 1–13 numaralı sembolleri gösteren test noktaları oluşturur;
+betiğin başındaki `SEMBOLLER` tablosu buna göre düzenlenebilir.
 
 Fare: sol tuş döndür, sağ tuş kaydır, tekerlek yakınlaştır.
 
