@@ -1,23 +1,23 @@
 Language="VBSCRIPT"
 ' ---------------------------------------------------------------------------------------
-' Proses 3D -> CATIA V5 makrosu (Python gerektirmez)
+' Tack/Proses Map -> CATIA V5 makrosu (Python gerektirmez)
 '
-' Proses 3D'nin "CATIA CSV" dugmesiyle kaydedilen dosyadaki noktalari aktif CATPart'a
+' Tack/Proses Map'nin "CATIA CSV" dugmesiyle kaydedilen dosyadaki noktalari aktif CATPart'a
 ' renk ve sembolleriyle birlikte aktarir.
 '
 ' Calistirma: CATIA'da hedef CATPart acikken
 '   Tools > Macro > Macros... (Alt+F8) > Macro libraries... > bu dosyanin klasorunu ekleyin
-'   > listeden Proses3D_CATIA.CATScript'i secin > Run
+'   > listeden TackProsesMap_CATIA.CATScript'i secin > Run
 ' Acilan pencereden CSV dosyasini secin.
 '
-' Yapi: "Proses3D_<baslik>" geometrik seti, icinde her renk/sembol grubu icin bir alt set.
+' Yapi: "TackProsesMap_<baslik>" geometrik seti, icinde her renk/sembol grubu icin bir alt set.
 ' Nokta adlari: <nokta adi>,<baglayici tipi>,<proses>
 ' ---------------------------------------------------------------------------------------
 
 ' True yapilirsa CSV yerine 1..13 numarali sembolleri gosteren test noktalari olusturulur
 Const SEMBOL_TESTI = False
 
-' Proses 3D sekil adi -> CATIA SetSymbolType numarasi. Numaralarin karsiligi CATIA surumune
+' Tack/Proses Map sekil adi -> CATIA SetSymbolType numarasi. Numaralarin karsiligi CATIA surumune
 ' gore degisebilir; SEMBOL_TESTI ile kontrol edip gerekirse degistirin.
 Function SembolNo(sekil)
     Select Case sekil
@@ -70,7 +70,7 @@ Function HedefPart()
             Exit Function
         End If
     End If
-    If MsgBox("Aktif dokuman bir CATPart degil. Yeni bir Part olusturulsun mu?", vbYesNo + vbQuestion, "Proses 3D") <> vbYes Then
+    If MsgBox("Aktif dokuman bir CATPart degil. Yeni bir Part olusturulsun mu?", vbYesNo + vbQuestion, "Tack/Proses Map") <> vbYes Then
         Set HedefPart = Nothing
         Exit Function
     End If
@@ -96,7 +96,7 @@ Sub SembolTesti()
         sel.VisProperties.SetSymbolType n
     Next
     sel.Clear
-    MsgBox "Sembol_1 ... Sembol_13 olusturuldu. SembolNo tablosunu buna gore duzenleyin.", vbInformation, "Proses 3D"
+    MsgBox "Sembol_1 ... Sembol_13 olusturuldu. SembolNo tablosunu buna gore duzenleyin.", vbInformation, "Tack/Proses Map"
 End Sub
 
 Sub CATMain()
@@ -106,7 +106,7 @@ Sub CATMain()
     End If
 
     Dim yol
-    yol = CATIA.FileSelectionBox("Proses 3D CATIA CSV dosyasini secin", "*.csv", 0)
+    yol = CATIA.FileSelectionBox("Tack/Proses Map CATIA CSV dosyasini secin", "*.csv", 0)
     If yol = "" Then Exit Sub
 
     ' CSV UTF-8 kaydedildigi icin ADODB.Stream ile okunur (FileSystemObject UTF-8 okuyamaz)
@@ -133,7 +133,7 @@ Sub CATMain()
     For Each k In Array("Ad", "X", "Y", "Z", "R", "G", "B", "Sekil", "Grup")
         If Not kol.Exists(k) Then
             MsgBox "CSV bicimi taninmadi (" & k & " sutunu yok)." & vbCrLf & _
-                   "Dosyayi Proses 3D'deki 'CATIA CSV' dugmesiyle kaydedin.", vbExclamation, "Proses 3D"
+                   "Dosyayi Tack/Proses Map'deki 'CATIA CSV' dugmesiyle kaydedin.", vbExclamation, "Tack/Proses Map"
             Exit Sub
         End If
     Next
@@ -156,7 +156,7 @@ Sub CATMain()
                     If UBound(alanlar) >= kol("Harita") Then harita = TirnakSil(alanlar(kol("Harita")))
                 End If
                 Set kok = part.HybridBodies.Add()
-                kok.Name = GuvenliAd("Proses3D_" & harita)
+                kok.Name = GuvenliAd("TackProsesMap_" & harita)
             End If
             g = TirnakSil(alanlar(kol("Grup")))
             If Not gruplar.Exists(g) Then
@@ -173,7 +173,7 @@ Sub CATMain()
         End If
     Next
     If adet = 0 Then
-        MsgBox "CSV dosyasinda nokta yok.", vbExclamation, "Proses 3D"
+        MsgBox "CSV dosyasinda nokta yok.", vbExclamation, "Tack/Proses Map"
         Exit Sub
     End If
     part.Update
@@ -194,5 +194,5 @@ Sub CATMain()
     Next
     sel.Clear
 
-    MsgBox adet & " nokta, " & gruplar.Count & " grup aktarildi." & vbCrLf & "Geometrik set: " & kok.Name, vbInformation, "Proses 3D"
+    MsgBox adet & " nokta, " & gruplar.Count & " grup aktarildi." & vbCrLf & "Geometrik set: " & kok.Name, vbInformation, "Tack/Proses Map"
 End Sub

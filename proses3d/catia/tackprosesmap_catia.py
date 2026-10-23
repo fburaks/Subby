@@ -1,24 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-Proses 3D -> CATIA V5 aktarımı
+Tack/Proses Map -> CATIA V5 aktarımı
 
-Proses 3D'nin "CATIA CSV" düğmesiyle kaydedilen dosyadaki noktaları açık CATIA oturumundaki
+Tack/Proses Map'nin "CATIA CSV" düğmesiyle kaydedilen dosyadaki noktaları açık CATIA oturumundaki
 Part dokümanına renk ve sembolleriyle birlikte aktarır.
 
 Gereksinimler (Windows):
     - CATIA V5 açık olmalı
     - Python 3 ve pywin32:  py -m pip install pywin32
 
-Kullanım: dosyayı çalıştırmanız yeterli (çift tıklama, IDE'de Run veya "py proses3d_catia.py").
+Kullanım: dosyayı çalıştırmanız yeterli (çift tıklama, IDE'de Run veya "py tackprosesmap_catia.py").
 Adımlar en alttaki calistir() fonksiyonunda sırayla çalışır:
     1) CSV dosyasını seç   2) CSV'yi oku   3) CATIA'ya bağlan   4) Hedef Part'ı al
     5) Geometrik setleri ve noktaları oluştur   6) Renk ve sembolleri uygula
 Ayarlar aşağıdaki AYARLAR bölümünden değiştirilebilir. Komut satırından da verilebilir:
-    py proses3d_catia.py harita_catia.csv [--yeni] [--sembol-testi]
+    py tackprosesmap_catia.py harita_catia.csv [--yeni] [--sembol-testi]
 
-Python kurulu değilse aynı işi CATIA içinden çalışan Proses3D_CATIA.CATScript makrosu yapar.
+Python kurulu değilse aynı işi CATIA içinden çalışan TackProsesMap_CATIA.CATScript makrosu yapar.
 
-Yapı: "Proses3D_<başlık>" adlı bir geometrik set ve içinde her kategori için bir alt set oluşturulur.
+Yapı: "TackProsesMap_<başlık>" adlı bir geometrik set ve içinde her kategori için bir alt set oluşturulur.
 Nokta adları: <nokta adı>,<bağlayıcı tipi>,<proses>
 """
 import csv
@@ -30,7 +30,7 @@ CSV_YOLU = ''          # boşsa dosya seçme penceresi açılır, ör. r'C:\Hari
 YENI_PART = False      # True: her zaman yeni bir Part oluştur
 SEMBOL_TESTI = False   # True: CSV yerine 1..13 numaralı sembolleri gösteren test noktaları oluştur
 
-# Proses 3D şekil adı -> CATIA nokta sembolü (VisPropertySet.SetSymbolType numarası).
+# Tack/Proses Map şekil adı -> CATIA nokta sembolü (VisPropertySet.SetSymbolType numarası).
 # Numaraların karşılığı CATIA sürümüne göre değişebilir. Emin olmak için önce
 # "--sembol-testi" ile test noktalarını oluşturup Graphic Properties'teki sembollerle
 # karşılaştırın ve gerekirse aşağıdaki numaraları değiştirin.
@@ -57,7 +57,7 @@ def win32_yukle():
     except ImportError:
         raise Hata('pywin32 kurulu değil. Komut isteminde şunu çalıştırın:\n'
                    '    py -m pip install pywin32\n'
-                   '(İnternet yoksa Proses3D_CATIA.CATScript makrosunu kullanın.)')
+                   '(İnternet yoksa TackProsesMap_CATIA.CATScript makrosunu kullanın.)')
     return win32com.client
 
 
@@ -95,7 +95,7 @@ def evet_mi(soru):
         from tkinter import Tk, messagebox
         kok = Tk()
         kok.withdraw()
-        cevap = messagebox.askyesno('Proses 3D -> CATIA', soru)
+        cevap = messagebox.askyesno('Tack/Proses Map -> CATIA', soru)
         kok.destroy()
         return cevap
     except Exception:
@@ -107,7 +107,7 @@ def csv_sec():
         from tkinter import Tk, filedialog
         kok = Tk()
         kok.withdraw()
-        yol = filedialog.askopenfilename(title='Proses 3D CATIA CSV dosyasını seçin',
+        yol = filedialog.askopenfilename(title='Tack/Proses Map CATIA CSV dosyasını seçin',
                                          filetypes=[('CATIA CSV', '*.csv'), ('Tüm dosyalar', '*.*')])
         kok.destroy()
         return yol
@@ -124,7 +124,7 @@ def csv_oku(yol):
         raise Hata('CSV açılamadı: %s' % e)
     gerekli = {'Ad', 'X', 'Y', 'Z', 'R', 'G', 'B', 'Sekil', 'Grup'}
     if not satirlar or not gerekli.issubset(satirlar[0].keys()):
-        raise Hata('CSV biçimi tanınmadı. Dosyayı Proses 3D\'deki "CATIA CSV" düğmesiyle kaydedin '
+        raise Hata('CSV biçimi tanınmadı. Dosyayı Tack/Proses Map\'deki "CATIA CSV" düğmesiyle kaydedin '
                    '("Nokta listesi (CSV)" farklı bir dosyadır).')
     print('  %d nokta okundu.' % len(satirlar))
     return satirlar
@@ -142,7 +142,7 @@ def setleri_olustur(part, satirlar):
     hsf = part.HybridShapeFactory
     baslik = satirlar[0].get('Harita') or 'Harita'
     ana_set = part.HybridBodies.Add()
-    ana_set.Name = guvenli_ad('Proses3D_' + baslik)
+    ana_set.Name = guvenli_ad('TackProsesMap_' + baslik)
 
     # Grupları CSV'deki sırayla oluştur
     gruplar = {}
@@ -233,7 +233,7 @@ def calistir():
 
 
 def calistir_ve_bekle():
-    print('Proses 3D -> CATIA aktarımı başlıyor...')
+    print('Tack/Proses Map -> CATIA aktarımı başlıyor...')
     try:
         calistir()
     except Hata as e:

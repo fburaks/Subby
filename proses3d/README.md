@@ -1,4 +1,4 @@
-# Proses 3D Görüntüleyici
+# Tack/Proses Map
 
 FPDF dosyasındaki bağlayıcı noktalarından 3D nokta bulutu oluşturur, MPF (makine programı)
 dosyasındaki prosesleri bağlayıcı ismi üzerinden bu noktalarla eşleştirir ve isteğe bağlı bir
@@ -6,7 +6,7 @@ dosyasındaki prosesleri bağlayıcı ismi üzerinden bu noktalarla eşleştirir
 
 ## Çalıştırma (Windows)
 
-Ek yazılım gerekmez. **`Proses3D.html`** dosyasını bilgisayara kopyalayıp çift tıklayın
+Ek yazılım gerekmez. **`TackProsesMap.html`** dosyasını bilgisayara kopyalayıp çift tıklayın
 (Chrome veya Edge önerilir). Tüm kütüphaneler dosyanın içine gömülüdür; internet bağlantısı
 ya da başka bir dosya gerekmez.
 
@@ -54,9 +54,9 @@ Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yenide
   (`Point_No--Fst-1962_cn1`, `..._cp12`, `..._cn1_cp2`) eşleştirmede atılır. Desen
   *MPF kuralları → Yok sayılan ek* alanından değiştirilebilir veya boş bırakılarak kapatılabilir.
   (İstenirse *MPF kuralları → Harf farkını yok say* açılabilir.)
-- `PSEN` bir noktada 0 veya daha fazla kez olabilir; sayımlarda **bir kez** sayılır
+- `PSEN` (*MPF kuralları → Referanslama prosesi*) bir noktada 0 veya daha fazla kez olabilir; sayımlarda **bir kez** sayılır
   (amaç PSEN yapılan pozisyon sayısıdır).
-- `CS` / `DONLY` / `DNOCLAMP` ("tekil prosesler") bir noktada en fazla **bir** kez ve yalnızca
+- `CS` / `DONLY` / `DNOCLAMP` (*MPF kuralları → Prosesler*) bir noktada en fazla **bir** kez ve yalnızca
   biri olabilir; ek olarak PSEN bulunabilir. Aksi durum **kural ihlali** olarak işaretlenir.
 - FPDF'de olup MPF'de olmayan noktalar gri halka ile, MPF'de olup FPDF'de olmayan isimler
   *Uyarılar* listesinde gösterilir.
@@ -67,11 +67,11 @@ Harita lejantının üstündeki düğmelerle (veya *Gösterim → Harita modu*) 
 | Mod | Renk | Şekil |
 |---|---|---|
 | **Tip** | Bağlayıcı tipi | Hepsi daire |
-| **Proses** | Tekil proses: CS / DONLY / DNOCLAMP (yanında PSEN olsa da o sayılır); Tekil proses yok (yalnızca PSEN olanlar ve prosesi olmayanlar); Çoklu proses (hatalı) | Tekil proses |
-| **Tip + Proses** (varsayılan) | Bağlayıcı tipi | Tekil proses |
-| **PSEN** | PSEN var: yeşil büyük yıldız; PSEN adayı ama PSEN yok: turuncu daire; diğer her şey: küçük gri daire | — |
+| **Proses** | CS / DONLY / DNOCLAMP (yanında PSEN olsa da o sayılır); Proses yok (yalnızca PSEN olanlar ve prosesi olmayanlar); Çoklu proses (hatalı) | Proses |
+| **Tip + Proses** (varsayılan) | Bağlayıcı tipi | Proses |
+| **PSEN** | **Tack rivet** (PSEN var): yeşil büyük yıldız; **Tack rivet, PSEN yok** (PSEN adayı): turuncu daire; **Tack yok**: küçük gri daire | — |
 
-- Tekil proses şekilleri: daire (yok), kare (CS), üçgen (DONLY), eşkenar dörtgen (DNOCLAMP),
+- Proses şekilleri: daire (proses yok), kare (CS), üçgen (DONLY), eşkenar dörtgen (DNOCLAMP),
   yıldız (çoklu proses — hatalı), halka (MPF'de yok).
 - **Çoklu proses (hatalı)**: PSEN harici en az 2 proses (ör. CS + DONLY veya iki kez DNOCLAMP).
 - Harita lejantındaki satırlara tıklanarak o kategori gizlenip gösterilebilir (paylaşılan haritada da).
@@ -79,6 +79,8 @@ Harita lejantının üstündeki düğmelerle (veya *Gösterim → Harita modu*) 
 - Arama kutusu: eşleşen noktalar vurgulanır, Enter ile ilk sonuca gidilir.
 - *Tablo* ve *Uyarılar* panelleri, CSV dışa aktarma (Excel için `;` ayraçlı).
 - 3D model: renk, opaklık, tel kafes, öteleme / dönme / ölçek ile noktalara hizalama.
+  *Noktalar model önünde* açıkken tüm noktalar modelin üstünde çizilir; kapalıyken modelin arkasında kalan
+  noktalar model renginde görünür.
 - **Özet lejantı** (harita üzerinde): harita başlığı, toplam bağlayıcı, PSEN olan nokta, bağlayıcı tiplerine göre sayılar, tekil proses sayıları ve kontrol sayıları.
   Bağlayıcı tipi varsayılan olarak FPDF proses kodu sütunudur; *FPDF sütunları* bölümünden
   ayrı bir sütun seçilebilir.
@@ -94,7 +96,7 @@ CGR kapalı bir format olduğu için doğrudan okunamaz. CATIA'dan:
   (isteğe bağlı) 3D model tek bir HTML dosyasına gömülür. Alıcı dosyayı çift tıklayarak açar ve
   haritayı aynı görünümde inceler. *Sadece 3D görünüm ve lejant* seçiliyse (varsayılan) alıcı
   yalnızca 3D pencereyi, özet lejantını ve görünüm düğmelerini görür; düzenleme paneli gizlenir.
-  Bu özellik yalnızca `Proses3D.html` sürümünde çalışır.
+  Bu özellik yalnızca `TackProsesMap.html` sürümünde çalışır.
 - **Görüntü (PNG)**: o anki görünüm + özet lejantı.
 - **CSV**: nokta listesi ve uyarılar.
 
@@ -102,20 +104,20 @@ CGR kapalı bir format olduğu için doğrudan okunamaz. CATIA'dan:
 1. Haritayı istenen moda getirin (gizlenen kategoriler aktarılmaz) ve *Kaydet / Paylaş → CATIA CSV* ile kaydedin.
 2. Aktarım için iki yol var:
    - **CATScript makrosu (önerilen, kurulum gerekmez):** *CATIA makrosu (CATScript)* ile
-     `Proses3D_CATIA.CATScript` dosyasını indirin. CATIA'da hedef CATPart açıkken
+     `TackProsesMap_CATIA.CATScript` dosyasını indirin. CATIA'da hedef CATPart açıkken
      *Tools → Macro → Macros…* (`Alt+F8`) → *Macro libraries…* ile dosyanın klasörünü ekleyin,
      makroyu seçip *Run*'a basın ve CSV'yi seçin.
    - **Python betiği:** Python 3 ve `py -m pip install pywin32` gerekir. Dosyayı çalıştırmanız yeterli
-     (çift tıklama, IDE'de Run veya `py proses3d_catia.py`): adımlar sırayla çalışır, CSV seçme penceresi
+     (çift tıklama, IDE'de Run veya `py tackprosesmap_catia.py`): adımlar sırayla çalışır, CSV seçme penceresi
      açılır. Betiğin başındaki `CSV_YOLU`, `YENI_PART`, `SEMBOL_TESTI` ayarları değiştirilebilir.
      Pencere sonunda açık kalır; hata varsa orada yazar.
-3. Sonuç: `Proses3D_<başlık>` geometrik seti, içinde her renk/sembol grubu için bir alt set.
+3. Sonuç: `TackProsesMap_<başlık>` geometrik seti, içinde her renk/sembol grubu için bir alt set.
    Nokta adları `<nokta adı>,<bağlayıcı tipi>,<proses>` (ör. `Point_No--Fst-1962,P20,CS`); bağlayıcı
    isimlerinde tire olabildiği için ayraç virgüldür.
    Proses değerleri: PSEN, CS, DONLY, DNOCLAMP, PROSESYOK, COKLU, MPFYOK.
 
 CATIA'nın sembol numaraları (SetSymbolType) sürüme göre farklı olabilir. Test noktaları için
-makroda `SEMBOL_TESTI = True` yapın veya `py proses3d_catia.py --sembol-testi` çalıştırın;
+makroda `SEMBOL_TESTI = True` yapın veya `py tackprosesmap_catia.py --sembol-testi` çalıştırın;
 1–13 numaralı sembolleri gösteren noktalar oluşur ve tablo (`SembolNo` / `SEMBOLLER`) buna göre düzenlenir.
 
 Fare: sol tuş döndür, sağ tuş kaydır, tekerlek yakınlaştır.
@@ -128,5 +130,5 @@ düğmesi bunların `ornek-data.js` içine gömülü kopyasını kullanır.
 - `js/parser.js` — FPDF/MPF ayrıştırma ve eşleştirme (tarayıcı ve Node uyumlu)
 - `js/app.js` — arayüz ve Three.js sahnesi
 - Ayrıştırıcı testleri: `node proses3d/test/parser.test.js`
-- `build.js` — tek dosyalık `Proses3D.html` üretir
+- `build.js` — tek dosyalık `TackProsesMap.html` üretir
 - Three.js r147 (MIT lisansı, `lib/three-LICENSE.txt`), chevrotain 9 (Apache-2.0, VRML ayrıştırma için)

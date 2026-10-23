@@ -1,4 +1,4 @@
-// Tek dosyalık sürümü üretir: node proses3d/build.js  ->  proses3d/Proses3D.html
+// Tek dosyalık sürümü üretir: node proses3d/build.js  ->  proses3d/TackProsesMap.html
 // index.html içindeki tüm CSS ve JS dosyaları sayfaya gömülür; böylece dosya tek başına
 // açılabilir ve "Haritayı kaydet" özelliği sayfanın kendisini şablon olarak kullanabilir.
 var fs = require('fs'), path = require('path');
@@ -23,6 +23,6 @@ html = html.replace(/<script type="text\/plain" id="([^"]+)" data-src="([^"]+)">
 });
 if (inlined !== expected) throw new Error('Gömülemeyen kaynak kaldı');
 
-var out = path.join(dir, 'Proses3D.html');
+var out = path.join(dir, 'TackProsesMap.html');
 fs.writeFileSync(out, html);
 console.log(out + ' (' + Math.round(fs.statSync(out).size / 1024) + ' KB)');

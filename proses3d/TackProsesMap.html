@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Proses 3D Görüntüleyici</title>
+<title>Tack/Proses Map</title>
 <style>
 :root {
   --bg: #0f1419;
@@ -171,7 +171,7 @@ body.viewer #info { top: 52px; }
   <!-- ======================= SOL PANEL ======================= -->
   <aside id="sidebar">
     <header class="brand">
-      <h1>Proses 3D</h1>
+      <h1>Tack/Proses Map</h1>
       <span class="sub">FPDF + MPF nokta bulutu</span>
     </header>
 
@@ -222,8 +222,8 @@ body.viewer #info { top: 52px; }
       <div class="grid2">
         <label>Pozisyon kodları</label><input id="cfgPos" type="text">
         <label>Proses kodları</label><input id="cfgProcKw" type="text">
-        <label>Tekil prosesler</label><input id="cfgExcl" type="text">
-        <label>Tekrarlı proses</label><input id="cfgRep" type="text">
+        <label>Prosesler</label><input id="cfgExcl" type="text" title="Bir noktada en fazla biri, bir kez olabilir">
+        <label>Referanslama prosesi</label><input id="cfgRep" type="text" title="Bir noktada birden fazla olabilir (PSEN)">
         <label>İsim kaynağı</label>
         <select id="cfgNameSrc">
           <option value="auto">Otomatik (önce pozisyon satırı)</option>
@@ -10595,25 +10595,25 @@ window.ORNEK_VERI = {"fpdf": "$ ORNEK FPDF DOSYASI (sentetik test verisi)\r\n$ P
 <script type="text/plain" id="catiaPy">
 # -*- coding: utf-8 -*-
 """
-Proses 3D -> CATIA V5 aktarımı
+Tack/Proses Map -> CATIA V5 aktarımı
 
-Proses 3D'nin "CATIA CSV" düğmesiyle kaydedilen dosyadaki noktaları açık CATIA oturumundaki
+Tack/Proses Map'nin "CATIA CSV" düğmesiyle kaydedilen dosyadaki noktaları açık CATIA oturumundaki
 Part dokümanına renk ve sembolleriyle birlikte aktarır.
 
 Gereksinimler (Windows):
     - CATIA V5 açık olmalı
     - Python 3 ve pywin32:  py -m pip install pywin32
 
-Kullanım: dosyayı çalıştırmanız yeterli (çift tıklama, IDE'de Run veya "py proses3d_catia.py").
+Kullanım: dosyayı çalıştırmanız yeterli (çift tıklama, IDE'de Run veya "py tackprosesmap_catia.py").
 Adımlar en alttaki calistir() fonksiyonunda sırayla çalışır:
     1) CSV dosyasını seç   2) CSV'yi oku   3) CATIA'ya bağlan   4) Hedef Part'ı al
     5) Geometrik setleri ve noktaları oluştur   6) Renk ve sembolleri uygula
 Ayarlar aşağıdaki AYARLAR bölümünden değiştirilebilir. Komut satırından da verilebilir:
-    py proses3d_catia.py harita_catia.csv [--yeni] [--sembol-testi]
+    py tackprosesmap_catia.py harita_catia.csv [--yeni] [--sembol-testi]
 
-Python kurulu değilse aynı işi CATIA içinden çalışan Proses3D_CATIA.CATScript makrosu yapar.
+Python kurulu değilse aynı işi CATIA içinden çalışan TackProsesMap_CATIA.CATScript makrosu yapar.
 
-Yapı: "Proses3D_<başlık>" adlı bir geometrik set ve içinde her kategori için bir alt set oluşturulur.
+Yapı: "TackProsesMap_<başlık>" adlı bir geometrik set ve içinde her kategori için bir alt set oluşturulur.
 Nokta adları: <nokta adı>,<bağlayıcı tipi>,<proses>
 """
 import csv
@@ -10625,7 +10625,7 @@ CSV_YOLU = ''          # boşsa dosya seçme penceresi açılır, ör. r'C:\Hari
 YENI_PART = False      # True: her zaman yeni bir Part oluştur
 SEMBOL_TESTI = False   # True: CSV yerine 1..13 numaralı sembolleri gösteren test noktaları oluştur
 
-# Proses 3D şekil adı -> CATIA nokta sembolü (VisPropertySet.SetSymbolType numarası).
+# Tack/Proses Map şekil adı -> CATIA nokta sembolü (VisPropertySet.SetSymbolType numarası).
 # Numaraların karşılığı CATIA sürümüne göre değişebilir. Emin olmak için önce
 # "--sembol-testi" ile test noktalarını oluşturup Graphic Properties'teki sembollerle
 # karşılaştırın ve gerekirse aşağıdaki numaraları değiştirin.
@@ -10652,7 +10652,7 @@ def win32_yukle():
     except ImportError:
         raise Hata('pywin32 kurulu değil. Komut isteminde şunu çalıştırın:\n'
                    '    py -m pip install pywin32\n'
-                   '(İnternet yoksa Proses3D_CATIA.CATScript makrosunu kullanın.)')
+                   '(İnternet yoksa TackProsesMap_CATIA.CATScript makrosunu kullanın.)')
     return win32com.client
 
 
@@ -10690,7 +10690,7 @@ def evet_mi(soru):
         from tkinter import Tk, messagebox
         kok = Tk()
         kok.withdraw()
-        cevap = messagebox.askyesno('Proses 3D -> CATIA', soru)
+        cevap = messagebox.askyesno('Tack/Proses Map -> CATIA', soru)
         kok.destroy()
         return cevap
     except Exception:
@@ -10702,7 +10702,7 @@ def csv_sec():
         from tkinter import Tk, filedialog
         kok = Tk()
         kok.withdraw()
-        yol = filedialog.askopenfilename(title='Proses 3D CATIA CSV dosyasını seçin',
+        yol = filedialog.askopenfilename(title='Tack/Proses Map CATIA CSV dosyasını seçin',
                                          filetypes=[('CATIA CSV', '*.csv'), ('Tüm dosyalar', '*.*')])
         kok.destroy()
         return yol
@@ -10719,7 +10719,7 @@ def csv_oku(yol):
         raise Hata('CSV açılamadı: %s' % e)
     gerekli = {'Ad', 'X', 'Y', 'Z', 'R', 'G', 'B', 'Sekil', 'Grup'}
     if not satirlar or not gerekli.issubset(satirlar[0].keys()):
-        raise Hata('CSV biçimi tanınmadı. Dosyayı Proses 3D\'deki "CATIA CSV" düğmesiyle kaydedin '
+        raise Hata('CSV biçimi tanınmadı. Dosyayı Tack/Proses Map\'deki "CATIA CSV" düğmesiyle kaydedin '
                    '("Nokta listesi (CSV)" farklı bir dosyadır).')
     print('  %d nokta okundu.' % len(satirlar))
     return satirlar
@@ -10737,7 +10737,7 @@ def setleri_olustur(part, satirlar):
     hsf = part.HybridShapeFactory
     baslik = satirlar[0].get('Harita') or 'Harita'
     ana_set = part.HybridBodies.Add()
-    ana_set.Name = guvenli_ad('Proses3D_' + baslik)
+    ana_set.Name = guvenli_ad('TackProsesMap_' + baslik)
 
     # Grupları CSV'deki sırayla oluştur
     gruplar = {}
@@ -10828,7 +10828,7 @@ def calistir():
 
 
 def calistir_ve_bekle():
-    print('Proses 3D -> CATIA aktarımı başlıyor...')
+    print('Tack/Proses Map -> CATIA aktarımı başlıyor...')
     try:
         calistir()
     except Hata as e:
@@ -10849,24 +10849,24 @@ calistir_ve_bekle()
 <script type="text/plain" id="catiaVbs">
 Language="VBSCRIPT"
 ' ---------------------------------------------------------------------------------------
-' Proses 3D -> CATIA V5 makrosu (Python gerektirmez)
+' Tack/Proses Map -> CATIA V5 makrosu (Python gerektirmez)
 '
-' Proses 3D'nin "CATIA CSV" dugmesiyle kaydedilen dosyadaki noktalari aktif CATPart'a
+' Tack/Proses Map'nin "CATIA CSV" dugmesiyle kaydedilen dosyadaki noktalari aktif CATPart'a
 ' renk ve sembolleriyle birlikte aktarir.
 '
 ' Calistirma: CATIA'da hedef CATPart acikken
 '   Tools > Macro > Macros... (Alt+F8) > Macro libraries... > bu dosyanin klasorunu ekleyin
-'   > listeden Proses3D_CATIA.CATScript'i secin > Run
+'   > listeden TackProsesMap_CATIA.CATScript'i secin > Run
 ' Acilan pencereden CSV dosyasini secin.
 '
-' Yapi: "Proses3D_<baslik>" geometrik seti, icinde her renk/sembol grubu icin bir alt set.
+' Yapi: "TackProsesMap_<baslik>" geometrik seti, icinde her renk/sembol grubu icin bir alt set.
 ' Nokta adlari: <nokta adi>,<baglayici tipi>,<proses>
 ' ---------------------------------------------------------------------------------------
 
 ' True yapilirsa CSV yerine 1..13 numarali sembolleri gosteren test noktalari olusturulur
 Const SEMBOL_TESTI = False
 
-' Proses 3D sekil adi -> CATIA SetSymbolType numarasi. Numaralarin karsiligi CATIA surumune
+' Tack/Proses Map sekil adi -> CATIA SetSymbolType numarasi. Numaralarin karsiligi CATIA surumune
 ' gore degisebilir; SEMBOL_TESTI ile kontrol edip gerekirse degistirin.
 Function SembolNo(sekil)
     Select Case sekil
@@ -10919,7 +10919,7 @@ Function HedefPart()
             Exit Function
         End If
     End If
-    If MsgBox("Aktif dokuman bir CATPart degil. Yeni bir Part olusturulsun mu?", vbYesNo + vbQuestion, "Proses 3D") <> vbYes Then
+    If MsgBox("Aktif dokuman bir CATPart degil. Yeni bir Part olusturulsun mu?", vbYesNo + vbQuestion, "Tack/Proses Map") <> vbYes Then
         Set HedefPart = Nothing
         Exit Function
     End If
@@ -10945,7 +10945,7 @@ Sub SembolTesti()
         sel.VisProperties.SetSymbolType n
     Next
     sel.Clear
-    MsgBox "Sembol_1 ... Sembol_13 olusturuldu. SembolNo tablosunu buna gore duzenleyin.", vbInformation, "Proses 3D"
+    MsgBox "Sembol_1 ... Sembol_13 olusturuldu. SembolNo tablosunu buna gore duzenleyin.", vbInformation, "Tack/Proses Map"
 End Sub
 
 Sub CATMain()
@@ -10955,7 +10955,7 @@ Sub CATMain()
     End If
 
     Dim yol
-    yol = CATIA.FileSelectionBox("Proses 3D CATIA CSV dosyasini secin", "*.csv", 0)
+    yol = CATIA.FileSelectionBox("Tack/Proses Map CATIA CSV dosyasini secin", "*.csv", 0)
     If yol = "" Then Exit Sub
 
     ' CSV UTF-8 kaydedildigi icin ADODB.Stream ile okunur (FileSystemObject UTF-8 okuyamaz)
@@ -10982,7 +10982,7 @@ Sub CATMain()
     For Each k In Array("Ad", "X", "Y", "Z", "R", "G", "B", "Sekil", "Grup")
         If Not kol.Exists(k) Then
             MsgBox "CSV bicimi taninmadi (" & k & " sutunu yok)." & vbCrLf & _
-                   "Dosyayi Proses 3D'deki 'CATIA CSV' dugmesiyle kaydedin.", vbExclamation, "Proses 3D"
+                   "Dosyayi Tack/Proses Map'deki 'CATIA CSV' dugmesiyle kaydedin.", vbExclamation, "Tack/Proses Map"
             Exit Sub
         End If
     Next
@@ -11005,7 +11005,7 @@ Sub CATMain()
                     If UBound(alanlar) >= kol("Harita") Then harita = TirnakSil(alanlar(kol("Harita")))
                 End If
                 Set kok = part.HybridBodies.Add()
-                kok.Name = GuvenliAd("Proses3D_" & harita)
+                kok.Name = GuvenliAd("TackProsesMap_" & harita)
             End If
             g = TirnakSil(alanlar(kol("Grup")))
             If Not gruplar.Exists(g) Then
@@ -11022,7 +11022,7 @@ Sub CATMain()
         End If
     Next
     If adet = 0 Then
-        MsgBox "CSV dosyasinda nokta yok.", vbExclamation, "Proses 3D"
+        MsgBox "CSV dosyasinda nokta yok.", vbExclamation, "Tack/Proses Map"
         Exit Sub
     End If
     part.Update
@@ -11043,11 +11043,11 @@ Sub CATMain()
     Next
     sel.Clear
 
-    MsgBox adet & " nokta, " & gruplar.Count & " grup aktarildi." & vbCrLf & "Geometrik set: " & kok.Name, vbInformation, "Proses 3D"
+    MsgBox adet & " nokta, " & gruplar.Count & " grup aktarildi." & vbCrLf & "Geometrik set: " & kok.Name, vbInformation, "Tack/Proses Map"
 End Sub
 </script>
 <script>/* js/app.js */
-/* Proses 3D Görüntüleyici - arayüz ve 3D sahne */
+/* Tack/Proses Map - arayüz ve 3D sahne */
 (function () {
   'use strict';
 
@@ -11055,7 +11055,7 @@ End Sub
   var STORE_KEY = 'proses3d.settings.v2';
 
   // Paylaşım dosyası için sayfanın kendisi şablon olarak saklanır. Bu yalnızca tüm kaynakların
-  // gömülü olduğu tek dosyalık Proses3D.html sürümünde mümkündür.
+  // gömülü olduğu tek dosyalık TackProsesMap.html sürümünde mümkündür.
   var TEMPLATE = (function () {
     if (document.querySelector('script[src], link[rel=stylesheet]')) return null;
     var root = document.documentElement.cloneNode(true);
@@ -11150,7 +11150,7 @@ End Sub
   // Şekil anahtarları ve etiketleri
   function shapeDefs() {
     var excl = Proses.keywordList(state.settings.mpf.exclusiveKeywords);
-    var defs = [{ key: 'NONE', label: 'Tekil proses yok', shape: 'circle' }];
+    var defs = [{ key: 'NONE', label: 'Proses yok', shape: 'circle' }];
     excl.forEach(function (k, i) { defs.push({ key: k, label: k, shape: EXTRA_SHAPES[i % EXTRA_SHAPES.length] }); });
     defs.push({ key: 'MULTI', label: 'Çoklu proses (hatalı)', shape: 'star' });
     defs.push({ key: 'OUT', label: 'MPF\'de yok', shape: 'ring' });
@@ -11182,15 +11182,15 @@ End Sub
 
   // Proses modu: Tip + Proses modundaki şekil gruplarıyla aynı; yalnızca tekil proses (CS / DONLY / DNOCLAMP)
   // gösterilir. PSEN'in yanında tekil proses varsa nokta o tekil prosesle anılır; yalnızca PSEN olan ve hiç
-  // prosesi olmayan noktalar "Tekil proses yok" grubundadır. PSEN harici en az 2 proses hatalıdır.
-  var PROC_NONE = 'Tekil proses yok', PROC_MULTI = 'Çoklu proses (hatalı)', PROC_OUT = 'MPF\'de yok';
+  // prosesi olmayan noktalar "Proses yok" grubundadır. PSEN harici en az 2 proses hatalıdır.
+  var PROC_NONE = 'Proses yok', PROC_MULTI = 'Çoklu proses (hatalı)', PROC_OUT = 'MPF\'de yok';
   function processKey(p) {
     if (!p.inMpf) return PROC_OUT;
     if (p.secondary === 'MULTI') return PROC_MULTI;
     return p.secondary !== 'NONE' ? p.secondary : PROC_NONE;
   }
   function processColor(k) {
-    return { 'Tekil proses yok': '#c9d3de', 'Çoklu proses (hatalı)': RED, 'MPF\'de yok': GRAY }[k];
+    return { 'Proses yok': '#c9d3de', 'Çoklu proses (hatalı)': RED, 'MPF\'de yok': GRAY }[k];
   }
   function processShapes() {
     var defs = shapeDefs().filter(function (d) { return d.key !== 'NONE' && d.key !== 'MULTI' && d.key !== 'OUT'; });
@@ -11212,7 +11212,7 @@ End Sub
         // PSEN noktaları belirgin (yeşil, büyük yıldız). FPDF proses kodu PSEN adayı olup MPF'de
         // PSEN'i olmayanlar turuncu; geri kalan her şey aynı küçük gri daire
         var pk = function (p) { return p.hasPsen ? 'PSEN' : p.psenCandidate ? 'ADAY' : 'YOK'; };
-        var labels = { PSEN: 'PSEN var', ADAY: 'PSEN adayı, PSEN yok', YOK: 'PSEN yok' };
+        var labels = { PSEN: 'Tack rivet', ADAY: 'Tack rivet, PSEN yok', YOK: 'Tack yok' };
         var sc = categorical(pk, function (k) { return { PSEN: PSEN_COLOR, ADAY: '#ffa726', YOK: GRAY }[k]; }, ['PSEN', 'ADAY', 'YOK']);
         sc.cats.forEach(function (c) { c.label = labels[c.key]; });
         return { scheme: sc, colorTitle: 'PSEN', shapeKeyOf: pk, shapeLegend: false,
@@ -11369,10 +11369,13 @@ End Sub
       var m = new THREE.PointsMaterial({
         size: size * ((defOf[sk] && defOf[sk].size) || 1), sizeAttenuation: false,
         map: shapeTexture((defOf[sk] && defOf[sk].shape) || 'circle'),
-        vertexColors: true, alphaTest: 0.5, depthTest: !onTop
+        vertexColors: true, alphaTest: 0.5,
+        // Önde: noktalar saydam kuyruğa alınıp modelden SONRA ve derinlik testi olmadan çizilir.
+        // Normalde opak çizilir; saydam model üstlerine biner, arkadakiler model renginde görünür.
+        transparent: onTop, depthTest: !onTop, depthWrite: !onTop
       });
       var pts = new THREE.Points(g, m);
-      pts.renderOrder = (onTop ? 5 : 0) + ((defOf[sk] && defOf[sk].order) || 0);
+      pts.renderOrder = (onTop ? 5 : 0) + ((defOf[sk] && defOf[sk].order) || 0);  // model: 0
       pointGroup.add(pts);
     });
 
@@ -11513,7 +11516,7 @@ End Sub
     if (md.shapeLegend) {
       var counts = {};
       pts.forEach(function (p) { var k = md.shapeKeyOf(p); counts[k] = (counts[k] || 0) + 1; });
-      addTitle(ls, 'Şekil: tekil proses');
+      addTitle(ls, 'Şekil: proses');
       md.shapes.forEach(function (d) {
         if (!counts[d.key] && (d.key === 'MULTI' || d.key === 'OUT')) return;
         ls.appendChild(legendItem(legendCanvas(d.shape, '#c9d3de'), d.label, counts[d.key] || 0, state.hiddenShapes, d.key));
@@ -11578,7 +11581,7 @@ End Sub
       '<tr><td>FPDF satırı</td><td>' + esc(loc(p)) + '</td></tr>' +
       '<tr><td>MPF pozisyon</td><td>' + p.positionCount + ' kez</td></tr>' +
       '<tr><td>PSEN</td><td>' + (p.hasPsen ? 'Var' : 'Yok') + '</td></tr>' +
-      '<tr><td>Tekil proses</td><td>' + esc(excl) + '</td></tr>' +
+      '<tr><td>Proses</td><td>' + esc(excl) + '</td></tr>' +
       '<tr><td>Kombinasyon</td><td>' + esc(p.combo) + '</td></tr>' +
       '</table>';
     p.issues.forEach(function (i) { html += '<div class="issue">⚠ ' + esc(i) + '</div>'; });
@@ -11685,7 +11688,7 @@ End Sub
     { key: 'fpdfProc', label: 'FPDF proses' },
     { key: 'x', label: 'X', num: true }, { key: 'y', label: 'Y', num: true }, { key: 'z', label: 'Z', num: true },
     { key: 'psenStr', label: 'PSEN' },
-    { key: 'exclusiveStr', label: 'Tekil proses' },
+    { key: 'exclusiveStr', label: 'Proses' },
     { key: 'combo', label: 'Kombinasyon' },
     { key: 'issueStr', label: 'Uyarı' }
   ];
@@ -12081,7 +12084,7 @@ End Sub
 
   $('btnCsv').onclick = function () {
     if (!state.result) return;
-    var rows = [['Baglayici', 'FPDF_Dosya', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN', 'PSEN_Aday', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
+    var rows = [['Baglayici', 'FPDF_Dosya', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN', 'PSEN_Aday', 'Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
     state.result.points.forEach(function (p) {
       rows.push([p.name, p.file, p.type, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.hasPsen ? 1 : 0, p.psenCandidate ? 1 : 0, p.exclusive.join(','), p.combo,
         p.processes.map(function (x) { return x.code + '@' + loc(x).replace('satır ', ''); }).join(' '), p.issues.join(' | ')]);
@@ -12113,7 +12116,7 @@ End Sub
     var meta = [metaOf(state.docs.fpdf, 'FPDF'), metaOf(state.docs.mpf, 'MPF')].filter(Boolean).join(' · ');
     var when = state.shared ? new Date(state.shared.created) : new Date();
     var modeLabel = MODES.filter(function (m) { return m.key === state.viewMode; })[0].label;
-    lines.push({ kind: 'title', label: $('mapTitle').value.trim() || 'Proses haritası' });
+    lines.push({ kind: 'title', label: $('mapTitle').value.trim() || 'Tack/Proses Map' });
     lines.push({ kind: 'meta', label: (meta ? meta + ' · ' : '') + when.toLocaleDateString('tr-TR') });
     lines.push({ kind: 'modes', label: 'Görünüm: ' + modeLabel });
     lines.push({ kind: 'row', label: 'Toplam bağlayıcı', value: pts.length });
@@ -12134,7 +12137,7 @@ End Sub
       colorRows(state.viewMode === 'process');
     }
     if (md.shapeLegend) {
-      lines.push({ kind: 'sec', label: 'Tekil prosesler' });
+      lines.push({ kind: 'sec', label: 'Proses' });
       md.shapes.forEach(function (d) {
         if (d.key === 'MULTI' || d.key === 'OUT') return;
         lines.push({ kind: 'row', label: d.label, value: shapeCounts[d.key] || 0, shape: d.shape, filter: { map: 's', key: d.key } });
@@ -12309,7 +12312,7 @@ End Sub
   $('btnShare').onclick = function () {
     if (!state.result) { alert('Önce FPDF dosyasını yükleyin.'); return; }
     if (!TEMPLATE) {
-      alert('Harita dosyası yalnızca tek dosyalık "Proses3D.html" sürümünden kaydedilebilir.');
+      alert('Harita dosyası yalnızca tek dosyalık "TackProsesMap.html" sürümünden kaydedilebilir.');
       return;
     }
     var json = JSON.stringify(collectShare()).replace(/</g, '\\u003c');
@@ -12361,12 +12364,13 @@ End Sub
       camera.updateProjectionMatrix();
       controls.update();
     } else setView('iso');
-    document.title = ($('mapTitle').value.trim() || 'Proses haritası') + ' - Proses 3D';
+    var mt = $('mapTitle').value.trim();
+    document.title = mt ? mt + ' - Tack/Proses Map' : 'Tack/Proses Map';
   }
 
   // ------------------------------------------------------------------ CATIA aktarımı
   // Haritada görünen noktalar, o anki modun renk ve şekilleriyle CSV'ye yazılır;
-  // catia/proses3d_catia.py bu dosyayı okuyup CATIA'da geometrik setler halinde oluşturur.
+  // catia/tackprosesmap_catia.py bu dosyayı okuyup CATIA'da geometrik setler halinde oluşturur.
   // Nokta adındaki proses: tekil proses varsa o, yoksa PSEN / PROSESYOK
   function catiaProc(p) {
     if (!p.inMpf) return 'MPFYOK';
@@ -12409,12 +12413,12 @@ End Sub
 
   function downloadEmbedded(id, name) {
     var src = $(id).textContent;
-    if (!src.trim()) { alert(name + ' bu sürümde gömülü değil; Proses3D.html kullanın veya catia/ klasöründen alın.'); return; }
+    if (!src.trim()) { alert(name + ' bu sürümde gömülü değil; TackProsesMap.html kullanın veya catia/ klasöründen alın.'); return; }
     // CATIA makroları Windows satır sonu bekler
     download(name, src.replace(/^\n/, '').replace(/\r?\n/g, '\r\n'), 'text/plain');
   }
-  $('btnCatiaPy').onclick = function () { downloadEmbedded('catiaPy', 'proses3d_catia.py'); };
-  $('btnCatiaVbs').onclick = function () { downloadEmbedded('catiaVbs', 'Proses3D_CATIA.CATScript'); };
+  $('btnCatiaPy').onclick = function () { downloadEmbedded('catiaPy', 'tackprosesmap_catia.py'); };
+  $('btnCatiaVbs').onclick = function () { downloadEmbedded('catiaVbs', 'TackProsesMap_CATIA.CATScript'); };
 
   // ------------------------------------------------------------------ başlat
   resize();

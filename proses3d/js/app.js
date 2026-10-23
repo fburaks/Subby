@@ -1,4 +1,4 @@
-/* Proses 3D Görüntüleyici - arayüz ve 3D sahne */
+/* Tack/Proses Map - arayüz ve 3D sahne */
 (function () {
   'use strict';
 
@@ -6,7 +6,7 @@
   var STORE_KEY = 'proses3d.settings.v2';
 
   // Paylaşım dosyası için sayfanın kendisi şablon olarak saklanır. Bu yalnızca tüm kaynakların
-  // gömülü olduğu tek dosyalık Proses3D.html sürümünde mümkündür.
+  // gömülü olduğu tek dosyalık TackProsesMap.html sürümünde mümkündür.
   var TEMPLATE = (function () {
     if (document.querySelector('script[src], link[rel=stylesheet]')) return null;
     var root = document.documentElement.cloneNode(true);
@@ -101,7 +101,7 @@
   // Şekil anahtarları ve etiketleri
   function shapeDefs() {
     var excl = Proses.keywordList(state.settings.mpf.exclusiveKeywords);
-    var defs = [{ key: 'NONE', label: 'Tekil proses yok', shape: 'circle' }];
+    var defs = [{ key: 'NONE', label: 'Proses yok', shape: 'circle' }];
     excl.forEach(function (k, i) { defs.push({ key: k, label: k, shape: EXTRA_SHAPES[i % EXTRA_SHAPES.length] }); });
     defs.push({ key: 'MULTI', label: 'Çoklu proses (hatalı)', shape: 'star' });
     defs.push({ key: 'OUT', label: 'MPF\'de yok', shape: 'ring' });
@@ -133,15 +133,15 @@
 
   // Proses modu: Tip + Proses modundaki şekil gruplarıyla aynı; yalnızca tekil proses (CS / DONLY / DNOCLAMP)
   // gösterilir. PSEN'in yanında tekil proses varsa nokta o tekil prosesle anılır; yalnızca PSEN olan ve hiç
-  // prosesi olmayan noktalar "Tekil proses yok" grubundadır. PSEN harici en az 2 proses hatalıdır.
-  var PROC_NONE = 'Tekil proses yok', PROC_MULTI = 'Çoklu proses (hatalı)', PROC_OUT = 'MPF\'de yok';
+  // prosesi olmayan noktalar "Proses yok" grubundadır. PSEN harici en az 2 proses hatalıdır.
+  var PROC_NONE = 'Proses yok', PROC_MULTI = 'Çoklu proses (hatalı)', PROC_OUT = 'MPF\'de yok';
   function processKey(p) {
     if (!p.inMpf) return PROC_OUT;
     if (p.secondary === 'MULTI') return PROC_MULTI;
     return p.secondary !== 'NONE' ? p.secondary : PROC_NONE;
   }
   function processColor(k) {
-    return { 'Tekil proses yok': '#c9d3de', 'Çoklu proses (hatalı)': RED, 'MPF\'de yok': GRAY }[k];
+    return { 'Proses yok': '#c9d3de', 'Çoklu proses (hatalı)': RED, 'MPF\'de yok': GRAY }[k];
   }
   function processShapes() {
     var defs = shapeDefs().filter(function (d) { return d.key !== 'NONE' && d.key !== 'MULTI' && d.key !== 'OUT'; });
@@ -163,7 +163,7 @@
         // PSEN noktaları belirgin (yeşil, büyük yıldız). FPDF proses kodu PSEN adayı olup MPF'de
         // PSEN'i olmayanlar turuncu; geri kalan her şey aynı küçük gri daire
         var pk = function (p) { return p.hasPsen ? 'PSEN' : p.psenCandidate ? 'ADAY' : 'YOK'; };
-        var labels = { PSEN: 'PSEN var', ADAY: 'PSEN adayı, PSEN yok', YOK: 'PSEN yok' };
+        var labels = { PSEN: 'Tack rivet', ADAY: 'Tack rivet, PSEN yok', YOK: 'Tack yok' };
         var sc = categorical(pk, function (k) { return { PSEN: PSEN_COLOR, ADAY: '#ffa726', YOK: GRAY }[k]; }, ['PSEN', 'ADAY', 'YOK']);
         sc.cats.forEach(function (c) { c.label = labels[c.key]; });
         return { scheme: sc, colorTitle: 'PSEN', shapeKeyOf: pk, shapeLegend: false,
@@ -320,10 +320,13 @@
       var m = new THREE.PointsMaterial({
         size: size * ((defOf[sk] && defOf[sk].size) || 1), sizeAttenuation: false,
         map: shapeTexture((defOf[sk] && defOf[sk].shape) || 'circle'),
-        vertexColors: true, alphaTest: 0.5, depthTest: !onTop
+        vertexColors: true, alphaTest: 0.5,
+        // Önde: noktalar saydam kuyruğa alınıp modelden SONRA ve derinlik testi olmadan çizilir.
+        // Normalde opak çizilir; saydam model üstlerine biner, arkadakiler model renginde görünür.
+        transparent: onTop, depthTest: !onTop, depthWrite: !onTop
       });
       var pts = new THREE.Points(g, m);
-      pts.renderOrder = (onTop ? 5 : 0) + ((defOf[sk] && defOf[sk].order) || 0);
+      pts.renderOrder = (onTop ? 5 : 0) + ((defOf[sk] && defOf[sk].order) || 0);  // model: 0
       pointGroup.add(pts);
     });
 
@@ -464,7 +467,7 @@
     if (md.shapeLegend) {
       var counts = {};
       pts.forEach(function (p) { var k = md.shapeKeyOf(p); counts[k] = (counts[k] || 0) + 1; });
-      addTitle(ls, 'Şekil: tekil proses');
+      addTitle(ls, 'Şekil: proses');
       md.shapes.forEach(function (d) {
         if (!counts[d.key] && (d.key === 'MULTI' || d.key === 'OUT')) return;
         ls.appendChild(legendItem(legendCanvas(d.shape, '#c9d3de'), d.label, counts[d.key] || 0, state.hiddenShapes, d.key));
@@ -529,7 +532,7 @@
       '<tr><td>FPDF satırı</td><td>' + esc(loc(p)) + '</td></tr>' +
       '<tr><td>MPF pozisyon</td><td>' + p.positionCount + ' kez</td></tr>' +
       '<tr><td>PSEN</td><td>' + (p.hasPsen ? 'Var' : 'Yok') + '</td></tr>' +
-      '<tr><td>Tekil proses</td><td>' + esc(excl) + '</td></tr>' +
+      '<tr><td>Proses</td><td>' + esc(excl) + '</td></tr>' +
       '<tr><td>Kombinasyon</td><td>' + esc(p.combo) + '</td></tr>' +
       '</table>';
     p.issues.forEach(function (i) { html += '<div class="issue">⚠ ' + esc(i) + '</div>'; });
@@ -636,7 +639,7 @@
     { key: 'fpdfProc', label: 'FPDF proses' },
     { key: 'x', label: 'X', num: true }, { key: 'y', label: 'Y', num: true }, { key: 'z', label: 'Z', num: true },
     { key: 'psenStr', label: 'PSEN' },
-    { key: 'exclusiveStr', label: 'Tekil proses' },
+    { key: 'exclusiveStr', label: 'Proses' },
     { key: 'combo', label: 'Kombinasyon' },
     { key: 'issueStr', label: 'Uyarı' }
   ];
@@ -1032,7 +1035,7 @@
 
   $('btnCsv').onclick = function () {
     if (!state.result) return;
-    var rows = [['Baglayici', 'FPDF_Dosya', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN', 'PSEN_Aday', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
+    var rows = [['Baglayici', 'FPDF_Dosya', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN', 'PSEN_Aday', 'Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
     state.result.points.forEach(function (p) {
       rows.push([p.name, p.file, p.type, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.hasPsen ? 1 : 0, p.psenCandidate ? 1 : 0, p.exclusive.join(','), p.combo,
         p.processes.map(function (x) { return x.code + '@' + loc(x).replace('satır ', ''); }).join(' '), p.issues.join(' | ')]);
@@ -1064,7 +1067,7 @@
     var meta = [metaOf(state.docs.fpdf, 'FPDF'), metaOf(state.docs.mpf, 'MPF')].filter(Boolean).join(' · ');
     var when = state.shared ? new Date(state.shared.created) : new Date();
     var modeLabel = MODES.filter(function (m) { return m.key === state.viewMode; })[0].label;
-    lines.push({ kind: 'title', label: $('mapTitle').value.trim() || 'Proses haritası' });
+    lines.push({ kind: 'title', label: $('mapTitle').value.trim() || 'Tack/Proses Map' });
     lines.push({ kind: 'meta', label: (meta ? meta + ' · ' : '') + when.toLocaleDateString('tr-TR') });
     lines.push({ kind: 'modes', label: 'Görünüm: ' + modeLabel });
     lines.push({ kind: 'row', label: 'Toplam bağlayıcı', value: pts.length });
@@ -1085,7 +1088,7 @@
       colorRows(state.viewMode === 'process');
     }
     if (md.shapeLegend) {
-      lines.push({ kind: 'sec', label: 'Tekil prosesler' });
+      lines.push({ kind: 'sec', label: 'Proses' });
       md.shapes.forEach(function (d) {
         if (d.key === 'MULTI' || d.key === 'OUT') return;
         lines.push({ kind: 'row', label: d.label, value: shapeCounts[d.key] || 0, shape: d.shape, filter: { map: 's', key: d.key } });
@@ -1260,7 +1263,7 @@
   $('btnShare').onclick = function () {
     if (!state.result) { alert('Önce FPDF dosyasını yükleyin.'); return; }
     if (!TEMPLATE) {
-      alert('Harita dosyası yalnızca tek dosyalık "Proses3D.html" sürümünden kaydedilebilir.');
+      alert('Harita dosyası yalnızca tek dosyalık "TackProsesMap.html" sürümünden kaydedilebilir.');
       return;
     }
     var json = JSON.stringify(collectShare()).replace(/</g, '\\u003c');
@@ -1312,12 +1315,13 @@
       camera.updateProjectionMatrix();
       controls.update();
     } else setView('iso');
-    document.title = ($('mapTitle').value.trim() || 'Proses haritası') + ' - Proses 3D';
+    var mt = $('mapTitle').value.trim();
+    document.title = mt ? mt + ' - Tack/Proses Map' : 'Tack/Proses Map';
   }
 
   // ------------------------------------------------------------------ CATIA aktarımı
   // Haritada görünen noktalar, o anki modun renk ve şekilleriyle CSV'ye yazılır;
-  // catia/proses3d_catia.py bu dosyayı okuyup CATIA'da geometrik setler halinde oluşturur.
+  // catia/tackprosesmap_catia.py bu dosyayı okuyup CATIA'da geometrik setler halinde oluşturur.
   // Nokta adındaki proses: tekil proses varsa o, yoksa PSEN / PROSESYOK
   function catiaProc(p) {
     if (!p.inMpf) return 'MPFYOK';
@@ -1360,12 +1364,12 @@
 
   function downloadEmbedded(id, name) {
     var src = $(id).textContent;
-    if (!src.trim()) { alert(name + ' bu sürümde gömülü değil; Proses3D.html kullanın veya catia/ klasöründen alın.'); return; }
+    if (!src.trim()) { alert(name + ' bu sürümde gömülü değil; TackProsesMap.html kullanın veya catia/ klasöründen alın.'); return; }
     // CATIA makroları Windows satır sonu bekler
     download(name, src.replace(/^\n/, '').replace(/\r?\n/g, '\r\n'), 'text/plain');
   }
-  $('btnCatiaPy').onclick = function () { downloadEmbedded('catiaPy', 'proses3d_catia.py'); };
-  $('btnCatiaVbs').onclick = function () { downloadEmbedded('catiaVbs', 'Proses3D_CATIA.CATScript'); };
+  $('btnCatiaPy').onclick = function () { downloadEmbedded('catiaPy', 'tackprosesmap_catia.py'); };
+  $('btnCatiaVbs').onclick = function () { downloadEmbedded('catiaVbs', 'TackProsesMap_CATIA.CATScript'); };
 
   // ------------------------------------------------------------------ başlat
   resize();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Proses 3D Görüntüleyici</title>
+<title>Tack/Proses Map</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
   <!-- ======================= SOL PANEL ======================= -->
   <aside id="sidebar">
     <header class="brand">
-      <h1>Proses 3D</h1>
+      <h1>Tack/Proses Map</h1>
       <span class="sub">FPDF + MPF nokta bulutu</span>
     </header>
 
@@ -62,8 +62,8 @@
       <div class="grid2">
         <label>Pozisyon kodları</label><input id="cfgPos" type="text">
         <label>Proses kodları</label><input id="cfgProcKw" type="text">
-        <label>Tekil prosesler</label><input id="cfgExcl" type="text">
-        <label>Tekrarlı proses</label><input id="cfgRep" type="text">
+        <label>Prosesler</label><input id="cfgExcl" type="text" title="Bir noktada en fazla biri, bir kez olabilir">
+        <label>Referanslama prosesi</label><input id="cfgRep" type="text" title="Bir noktada birden fazla olabilir (PSEN)">
         <label>İsim kaynağı</label>
         <select id="cfgNameSrc">
           <option value="auto">Otomatik (önce pozisyon satırı)</option>
@@ -189,8 +189,8 @@
 <script src="lib/VRMLLoader.js"></script>
 <script src="js/parser.js"></script>
 <script src="ornek/ornek-data.js"></script>
-<script type="text/plain" id="catiaPy" data-src="catia/proses3d_catia.py"></script>
-<script type="text/plain" id="catiaVbs" data-src="catia/Proses3D_CATIA.CATScript"></script>
+<script type="text/plain" id="catiaPy" data-src="catia/tackprosesmap_catia.py"></script>
+<script type="text/plain" id="catiaVbs" data-src="catia/TackProsesMap_CATIA.CATScript"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
