@@ -26,6 +26,10 @@ Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yenide
 ### FPDF
 - `$` ile başlayan satırlar yorumdur, boş satırlar atlanır.
 - Diğer satırlar virgülle (ayarlanabilir) ayrılır.
+- Proses sütunu `X1-A0410` biçimindedir: **proses kodu tireden önceki kısımdır** (`X1`).
+  (*FPDF sütunları → Tireden önce* ile kapatılabilir.)
+- **PSEN aday kodları** (varsayılan `U1, X1, O1, O2, Q1, R3, R4, R, HR, X2, F2`): bu kodlu noktalara PSEN
+  yapılabilir. MPF'de PSEN'i olmayan adaylar PSEN haritasında ayrıca (turuncu) gösterilir.
 - Proses kodu, bağlayıcı ismi, X, Y, Z sütunlarının **kaçıncı alan olduğu** sol paneldeki
   *FPDF sütunları* bölümünden ayarlanır (1'den başlar). Ayarlar tarayıcıda saklanır, ayrıca
   JSON olarak dışa/içe aktarılabilir.
@@ -65,7 +69,7 @@ Harita lejantının üstündeki düğmelerle (veya *Gösterim → Harita modu*) 
 | **Tip** | Bağlayıcı tipi | Hepsi daire |
 | **Proses** | Tekil proses: CS / DONLY / DNOCLAMP (yanında PSEN olsa da o sayılır); Tekil proses yok (yalnızca PSEN olanlar ve prosesi olmayanlar); Çoklu proses (hatalı) | Tekil proses |
 | **Tip + Proses** (varsayılan) | Bağlayıcı tipi | Tekil proses |
-| **PSEN** | PSEN var: yeşil büyük yıldız; diğer her şey: küçük gri daire | — |
+| **PSEN** | PSEN var: yeşil büyük yıldız; PSEN adayı ama PSEN yok: turuncu daire; diğer her şey: küçük gri daire | — |
 
 - Tekil proses şekilleri: daire (yok), kare (CS), üçgen (DONLY), eşkenar dörtgen (DNOCLAMP),
   yıldız (çoklu proses — hatalı), halka (MPF'de yok).

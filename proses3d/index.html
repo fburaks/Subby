@@ -42,7 +42,7 @@
 
     <details>
       <summary>FPDF sütunları</summary>
-      <p class="hint">Sütun numaraları 1'den başlar. Bağlayıcı tipi için 0 girilirse proses kodu sütunu kullanılır. <code>$</code> ile başlayan satırlar yorum kabul edilir.</p>
+      <p class="hint">Sütun numaraları 1'den başlar. Bağlayıcı tipi için 0 girilirse proses kodu kullanılır. <i>Tireden önce</i> açıkken <code>X1-A0410</code> değerinin proses kodu <code>X1</code> olur. <i>PSEN aday kodları</i>: PSEN yapılabilecek noktalar; MPF'de PSEN'i yoksa PSEN haritasında ayrıca gösterilir. <code>$</code> ile başlayan satırlar yorum kabul edilir.</p>
       <div class="grid2">
         <label>Ayraç</label><input id="cfgDelim" type="text" value=",">
         <label>Proses kodu</label><input id="cfgProc" type="number" min="1">
@@ -51,6 +51,8 @@
         <label>Y</label><input id="cfgY" type="number" min="1">
         <label>Z</label><input id="cfgZ" type="number" min="1">
         <label>Bağlayıcı tipi</label><input id="cfgType" type="number" min="0" title="0 = proses kodu sütunu kullanılır">
+        <label>Tireden önce</label><input id="cfgDash" type="checkbox" title="X1-A0410 -> proses kodu X1">
+        <label>PSEN aday kodları</label><input id="cfgPsenCodes" type="text" title="Bu proses kodlarına sahip noktalara PSEN yapılabilir">
       </div>
       <div id="fpdfPreview" class="preview"></div>
     </details>

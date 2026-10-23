@@ -160,12 +160,16 @@
     var typeKey = function (p) { return p.type || '(boş)'; };
     switch (state.viewMode) {
       case 'psen':
-        // PSEN noktaları belirgin (yeşil, büyük yıldız); geri kalan her şey aynı küçük gri daire
-        var pk = function (p) { return p.hasPsen ? 'PSEN' : 'YOK'; };
-        var sc = categorical(pk, function (k) { return k === 'PSEN' ? PSEN_COLOR : GRAY; });
-        sc.cats.forEach(function (c) { c.label = c.key === 'PSEN' ? 'PSEN var' : 'PSEN yok'; });
+        // PSEN noktaları belirgin (yeşil, büyük yıldız). FPDF proses kodu PSEN adayı olup MPF'de
+        // PSEN'i olmayanlar turuncu; geri kalan her şey aynı küçük gri daire
+        var pk = function (p) { return p.hasPsen ? 'PSEN' : p.psenCandidate ? 'ADAY' : 'YOK'; };
+        var labels = { PSEN: 'PSEN var', ADAY: 'PSEN adayı, PSEN yok', YOK: 'PSEN yok' };
+        var sc = categorical(pk, function (k) { return { PSEN: PSEN_COLOR, ADAY: '#ffa726', YOK: GRAY }[k]; }, ['PSEN', 'ADAY', 'YOK']);
+        sc.cats.forEach(function (c) { c.label = labels[c.key]; });
         return { scheme: sc, colorTitle: 'PSEN', shapeKeyOf: pk, shapeLegend: false,
-          shapes: [{ key: 'PSEN', label: 'PSEN var', shape: 'star', size: 1.5, order: 2 }, { key: 'YOK', label: 'PSEN yok', shape: 'circle', size: 0.6 }] };
+          shapes: [{ key: 'PSEN', label: labels.PSEN, shape: 'star', size: 1.5, order: 2 },
+            { key: 'ADAY', label: labels.ADAY, shape: 'circle', size: 1.1, order: 1 },
+            { key: 'YOK', label: labels.YOK, shape: 'circle', size: 0.6 }] };
       case 'type':
         return { scheme: categorical(typeKey), colorTitle: 'Bağlayıcı tipi', shapeLegend: false,
           shapeKeyOf: function () { return 'ALL'; }, shapes: [{ key: 'ALL', shape: 'circle' }] };
@@ -518,7 +522,8 @@
     var excl = p.exclusive.length ? p.exclusive.join(', ') : '—';
     var html = '<h3>' + esc(p.name || '(isimsiz)') + '</h3>' +
       '<table class="kv">' +
-      '<tr><td>FPDF proses</td><td>' + esc(p.fpdfProc) + '</td></tr>' +
+      '<tr><td>FPDF proses</td><td>' + esc(p.fpdfProc) + (p.fpdfProcRaw !== p.fpdfProc ? ' <span class="muted">(' + esc(p.fpdfProcRaw) + ')</span>' : '') + '</td></tr>' +
+      '<tr><td>PSEN adayı</td><td>' + (p.psenCandidate ? 'Evet' : 'Hayır') + '</td></tr>' +
       '<tr><td>Bağlayıcı tipi</td><td>' + esc(p.type) + '</td></tr>' +
       '<tr><td>X / Y / Z</td><td>' + fmt(p.x) + ' / ' + fmt(p.y) + ' / ' + fmt(p.z) + '</td></tr>' +
       '<tr><td>FPDF satırı</td><td>' + esc(loc(p)) + '</td></tr>' +
@@ -769,7 +774,7 @@
   var FORM = [
     ['cfgDelim', 'fpdf', 'delimiter'], ['cfgProc', 'fpdf', 'procCol', true], ['cfgName', 'fpdf', 'nameCol', true],
     ['cfgX', 'fpdf', 'xCol', true], ['cfgY', 'fpdf', 'yCol', true], ['cfgZ', 'fpdf', 'zCol', true],
-    ['cfgType', 'fpdf', 'typeCol', 'zero'],
+    ['cfgType', 'fpdf', 'typeCol', 'zero'], ['cfgPsenCodes', 'fpdf', 'psenCodes', 'text0'],
     ['cfgPos', 'mpf', 'positionKeywords'], ['cfgProcKw', 'mpf', 'processKeywords'],
     ['cfgExcl', 'mpf', 'exclusiveKeywords'], ['cfgRep', 'mpf', 'repeatableKeyword'], ['cfgNameSrc', 'mpf', 'nameSource'],
     ['cfgIgnore', 'mpf', 'nameIgnorePattern', 'text0']
@@ -777,6 +782,7 @@
   function settingsToForm() {
     FORM.forEach(function (f) { $(f[0]).value = state.settings[f[1]][f[2]]; });
     $('cfgCI').checked = state.settings.matchCaseInsensitive;
+    $('cfgDash').checked = state.settings.fpdf.procBeforeDash;
   }
   function formToSettings() {
     FORM.forEach(function (f) {
@@ -786,13 +792,14 @@
       state.settings[f[1]][f[2]] = v;
     });
     state.settings.matchCaseInsensitive = $('cfgCI').checked;
+    state.settings.fpdf.procBeforeDash = $('cfgDash').checked;
     saveSettings();
   }
   settingsToForm();
   $('btnApply').onclick = function () { formToSettings(); state.hiddenShapes = {}; process(); };
   $('btnReset').onclick = function () { state.settings = Proses.mergeSettings(); settingsToForm(); saveSettings(); process(); };
   // Sütun numaraları değiştikçe önizlemeyi güncelle
-  ['cfgDelim', 'cfgProc', 'cfgName', 'cfgX', 'cfgY', 'cfgZ', 'cfgType'].forEach(function (id) {
+  ['cfgDelim', 'cfgProc', 'cfgName', 'cfgX', 'cfgY', 'cfgZ', 'cfgType', 'cfgDash', 'cfgPsenCodes'].forEach(function (id) {
     $(id).addEventListener('change', function () { formToSettings(); process(); });
   });
 
@@ -1025,13 +1032,13 @@
 
   $('btnCsv').onclick = function () {
     if (!state.result) return;
-    var rows = [['Baglayici', 'FPDF_Dosya', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
+    var rows = [['Baglayici', 'FPDF_Dosya', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN', 'PSEN_Aday', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
     state.result.points.forEach(function (p) {
-      rows.push([p.name, p.file, p.type, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.hasPsen ? 1 : 0, p.exclusive.join(','), p.combo,
+      rows.push([p.name, p.file, p.type, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.hasPsen ? 1 : 0, p.psenCandidate ? 1 : 0, p.exclusive.join(','), p.combo,
         p.processes.map(function (x) { return x.code + '@' + loc(x).replace('satır ', ''); }).join(' '), p.issues.join(' | ')]);
     });
     state.result.unmatched.forEach(function (u) {
-      rows.push([u.name, '', '', '', '', '', '', '', '', '', '', 'FPDF\'de yok', u.processes.map(function (x) { return x.code + '@' + loc(x).replace('satır ', ''); }).join(' '), 'FPDF\'de yok']);
+      rows.push([u.name, '', '', '', '', '', '', '', '', '', '', '', 'FPDF\'de yok', u.processes.map(function (x) { return x.code + '@' + loc(x).replace('satır ', ''); }).join(' '), 'FPDF\'de yok']);
     });
     download(baseName() + '_noktalar.csv', '\uFEFF' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'), 'text/csv');
   };

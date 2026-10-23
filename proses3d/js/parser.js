@@ -19,7 +19,11 @@
       yCol: 4,
       zCol: 5,
       // Bağlayıcı tipi sütunu; 0 = proses kodu sütununu kullan
-      typeCol: 0
+      typeCol: 0,
+      // Proses sütunu "X1-A0410" biçiminde: proses kodu tireden önceki kısımdır ("X1")
+      procBeforeDash: true,
+      // PSEN yapılabilecek proses kodları; MPF'de PSEN olmasa da PSEN haritasında ayrıca gösterilir
+      psenCodes: 'U1,X1,O1,O2,Q1,R3,R4,R,HR,X2,F2'
     },
     mpf: {
       commentPrefix: '$',
@@ -96,6 +100,7 @@
   // ---------------------------------------------------------------- FPDF
   function parseFPDF(text, settings) {
     var cfg = mergeSettings(settings).fpdf;
+    var psenCodes = keywordList(cfg.psenCodes);
     var delim = cfg.delimiter === '\\t' ? '\t' : (cfg.delimiter || ',');
     var lines = splitLines(text);
     var points = [];
@@ -129,11 +134,15 @@
       if (!name) {
         warnings.push({ type: 'fpdf-noname', line: lineNo, msg: 'FPDF satır ' + lineNo + ': bağlayıcı ismi boş', text: line });
       }
+      var proc = fields[cols.proc] || '';
+      if (cfg.procBeforeDash && proc.indexOf('-') >= 0) proc = proc.slice(0, proc.indexOf('-')).trim();
       points.push({
         id: points.length,
         name: name,
-        fpdfProc: fields[cols.proc],
-        type: cols.type >= 0 ? fields[cols.type] : fields[cols.proc],
+        fpdfProc: proc,
+        fpdfProcRaw: fields[cols.proc],
+        psenCandidate: psenCodes.indexOf(proc.toUpperCase()) >= 0,
+        type: cols.type >= 0 ? fields[cols.type] : proc,
         x: x, y: y, z: z,
         line: lineNo,
         fields: fields

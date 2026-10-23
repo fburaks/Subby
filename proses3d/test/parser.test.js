@@ -147,3 +147,12 @@ assert.strictEqual(P.match(P.parseFPDF('A,Point_No--Fst-196,0,0,0\n'), sm).point
 // Boş desen: kapalı
 assert.strictEqual(P.match(sf, sm, { mpf: { nameIgnorePattern: '' } }).points[1].inMpf, false);
 console.log('yardımcı ek testleri geçti');
+
+// Proses sütunu "X1-A0410": kod tireden önceki kısım; PSEN aday kodları
+var pf = P.parseFPDF('X1-A0410,N1,0,0,0\nK5-B0001,N2,1,0,0\nHR-C77,N3,2,0,0\nR,N4,3,0,0\n');
+assert.deepStrictEqual(pf.points.map(function (p) { return p.fpdfProc; }), ['X1', 'K5', 'HR', 'R']);
+assert.strictEqual(pf.points[0].fpdfProcRaw, 'X1-A0410');
+assert.strictEqual(pf.points[0].type, 'X1');
+assert.deepStrictEqual(pf.points.map(function (p) { return p.psenCandidate; }), [true, false, true, true]);
+assert.strictEqual(P.parseFPDF('X1-A0410,N1,0,0,0\n', { fpdf: { procBeforeDash: false } }).points[0].fpdfProc, 'X1-A0410');
+console.log('proses kodu testleri geçti');
