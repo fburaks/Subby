@@ -18,12 +18,12 @@
     <details open>
       <summary>Dosyalar</summary>
       <div class="filerow">
-        <label class="btn file">FPDF yükle<input type="file" id="inFpdf" accept=".fpdf,.txt,.csv,*"></label>
-        <span id="lblFpdf" class="fname">—</span>
+        <label class="btn file">FPDF ekle<input type="file" id="inFpdf" accept=".fpdf,.txt,.csv,*" multiple></label>
+        <div id="listFpdf" class="filelist"><span class="fname">—</span></div>
       </div>
       <div class="filerow">
-        <label class="btn file">MPF yükle<input type="file" id="inMpf" accept=".mpf,.txt,*"></label>
-        <span id="lblMpf" class="fname">—</span>
+        <label class="btn file">MPF ekle<input type="file" id="inMpf" accept=".mpf,.spf,.txt,*" multiple></label>
+        <div id="listMpf" class="filelist"><span class="fname">—</span></div>
       </div>
       <div class="filerow">
         <label class="btn file">3D model<input type="file" id="inModel" accept=".stl,.wrl,.vrml,.obj,.ply,.glb"></label>
@@ -37,7 +37,7 @@
           <option value="windows-1252">Windows-1252</option>
         </select>
       </div>
-      <p class="hint">Dosyaları pencereye sürükleyip bırakabilirsiniz. Desteklenen modeller: STL, VRML (.wrl), OBJ, PLY, GLB. CATIA: CATPart → STL, CATProduct → VRML olarak kaydedin.</p>
+      <p class="hint">Birden fazla FPDF ve MPF eklenebilir; hepsi birlikte işlenir. Dosyaları pencereye sürükleyip bırakabilirsiniz. Desteklenen modeller: STL, VRML (.wrl), OBJ, PLY, GLB. CATIA: CATPart → STL, CATProduct → VRML olarak kaydedin.</p>
     </details>
 
     <details>

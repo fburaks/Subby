@@ -15,6 +15,14 @@ Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yenide
 
 ## Dosya kuralları
 
+### Birden fazla dosya
+- *FPDF ekle* / *MPF ekle* ile (veya sürükle-bırak) istenen sayıda dosya eklenir; listeden × ile çıkarılır.
+  Aynı adla yeniden eklenen dosya eskisinin yerine geçer.
+- Tüm FPDF noktaları tek nokta bulutunda birleşir; tüm MPF'lerin prosesleri isim üzerinden eşleşir.
+  Aynı bağlayıcı birden fazla MPF'de geçiyorsa prosesleri aynı noktada toplanır (tekil proses kuralı
+  dosyalar arasında da geçerlidir).
+- Çoklu dosyada satır konumları `dosya:satır` olarak gösterilir; paylaşım dosyası tüm dosyaları içerir.
+
 ### FPDF
 - `$` ile başlayan satırlar yorumdur, boş satırlar atlanır.
 - Diğer satırlar virgülle (ayarlanabilir) ayrılır.

@@ -210,6 +210,43 @@
     return { blocks: blocks, processes: processes, warnings: warnings, stats: stats };
   }
 
+  // ---------------------------------------------------------------- Çoklu dosya
+  // files: [{ name, text }]. Her dosya ayrı ayrıştırılıp sonuçlar birleştirilir; noktalara,
+  // bloklara, proseslere ve uyarılara kaynak dosya adı (file) eklenir. Aynı bağlayıcı birden
+  // fazla MPF'de geçiyorsa prosesleri aynı noktada toplanır.
+  function addStats(into, from) { for (var k in from) into[k] = (into[k] || 0) + from[k]; }
+
+  function tagWarnings(list, name, multi) {
+    list.forEach(function (w) { w.file = name; if (multi) w.msg = '[' + name + '] ' + w.msg; });
+    return list;
+  }
+
+  function parseFPDFFiles(files, settings) {
+    var out = { points: [], warnings: [], stats: { files: files.length } };
+    files.forEach(function (f) {
+      var r = parseFPDF(f.text, settings);
+      r.points.forEach(function (p) { p.id = out.points.length; p.file = f.name; out.points.push(p); });
+      out.warnings = out.warnings.concat(tagWarnings(r.warnings, f.name, files.length > 1));
+      addStats(out.stats, r.stats);
+    });
+    return out;
+  }
+
+  function parseMPFFiles(files, settings) {
+    var out = { blocks: [], processes: [], warnings: [], stats: { files: files.length } };
+    files.forEach(function (f) {
+      var r = parseMPF(f.text, settings), off = out.blocks.length;
+      r.blocks.forEach(function (b) { b.index += off; b.file = f.name; out.blocks.push(b); });
+      r.processes.forEach(function (p) { if (p.blockIndex >= 0) p.blockIndex += off; p.file = f.name; out.processes.push(p); });
+      out.warnings = out.warnings.concat(tagWarnings(r.warnings, f.name, files.length > 1));
+      addStats(out.stats, r.stats);
+    });
+    return out;
+  }
+
+  // Satır konumu: çoklu dosyada "dosya:satır"
+  function where(o) { return o.file ? o.file + ':' + o.line : 'satır ' + o.line; }
+
   // ---------------------------------------------------------------- Eşleştirme
   /*
    * Her FPDF noktasına MPF proseslerini isim üzerinden bağlar ve kuralları kontrol eder:
@@ -235,7 +272,7 @@
       pt.blocks = [];
       if (!byName[key]) byName[key] = [];
       else if (byName[key].length === 1) {
-        warnings.push({ type: 'fpdf-dup', line: pt.line, msg: 'FPDF: "' + pt.name + '" ismi birden fazla satırda var (satır ' + byName[key][0].line + ', ' + pt.line + '...)' });
+        warnings.push({ type: 'fpdf-dup', line: pt.line, file: pt.file, msg: 'FPDF: "' + pt.name + '" ismi birden fazla satırda var (' + where(byName[key][0]) + ', ' + where(pt) + '...)' });
       }
       byName[key].push(pt);
     });
@@ -271,7 +308,7 @@
           ? 'Birden fazla tekil proses: ' + pt.exclusive.join(', ')
           : uniq[0] + ' prosesi ' + pt.exclusive.length + ' kez tekrarlanmış';
         pt.issues.push(msg);
-        warnings.push({ type: 'rule-exclusive', line: pt.line, name: pt.name, msg: '"' + pt.name + '": ' + msg });
+        warnings.push({ type: 'rule-exclusive', line: pt.line, file: pt.file, name: pt.name, msg: '"' + pt.name + '": ' + msg });
       }
       // Aynı noktanın proseslerinin farklı pozisyon bloklarına dağılması bilgisi
       var blocksSeen = {};
@@ -288,7 +325,7 @@
 
     var unmatchedList = Object.keys(unmatched).map(function (k) { return unmatched[k]; });
     unmatchedList.forEach(function (u) {
-      warnings.push({ type: 'mpf-unmatched', line: u.processes[0].line, name: u.name, msg: 'MPF: "' + (u.name || '(isimsiz)') + '" FPDF\'de yok (' + u.processes.length + ' proses, ilk satır ' + u.processes[0].line + ')' });
+      warnings.push({ type: 'mpf-unmatched', line: u.processes[0].line, file: u.processes[0].file, name: u.name, msg: 'MPF: "' + (u.name || '(isimsiz)') + '" FPDF\'de yok (' + u.processes.length + ' proses, ilk ' + where(u.processes[0]) + ')' });
     });
 
     return { points: fpdf.points, unmatched: unmatchedList, warnings: warnings, summary: summary };
@@ -309,6 +346,8 @@
     mergeSettings: mergeSettings,
     parseFPDF: parseFPDF,
     parseMPF: parseMPF,
+    parseFPDFFiles: parseFPDFFiles,
+    parseMPFFiles: parseMPFFiles,
     match: match,
     keywordList: keywordList
   };

@@ -18,9 +18,8 @@
   // ------------------------------------------------------------------ durum
   var state = {
     settings: loadSettings(),
-    files: { fpdf: null, mpf: null },      // File nesneleri (kodlama değişince yeniden okunur)
-    text: { fpdf: '', mpf: '' },
-    names: { fpdf: '', mpf: '' },
+    // Yüklenen dosyalar: [{ name, text, file }] (file: kodlama değişince yeniden okumak için)
+    docs: { fpdf: [], mpf: [] },
     fpdf: null, mpf: null, result: null,
     warnings: [],
     viewMode: 'both',     // type | process | both | psen
@@ -400,15 +399,16 @@
 
   // ------------------------------------------------------------------ işleme
   function process() {
-    if (!state.text.fpdf) { state.result = null; refreshAll(); return; }
+    renderFileLists();
+    if (!state.docs.fpdf.length) { state.result = null; state.selected = null; refreshAll(); return; }
     var s = state.settings;
-    state.fpdf = Proses.parseFPDF(state.text.fpdf, s);
-    state.mpf = Proses.parseMPF(state.text.mpf || '', s);
+    state.fpdf = Proses.parseFPDFFiles(state.docs.fpdf, s);
+    state.mpf = Proses.parseMPFFiles(state.docs.mpf, s);
     state.result = Proses.match(state.fpdf, state.mpf, s);
     state.warnings = state.fpdf.warnings.concat(state.mpf.warnings, state.result.warnings);
     if (state.selected) {
       var sel = state.selected;
-      state.selected = state.result.points.filter(function (p) { return p.line === sel.line; })[0] || null;
+      state.selected = state.result.points.filter(function (p) { return p.file === sel.file && p.line === sel.line; })[0] || null;
     }
     refreshAll();
     if (state.firstFit && state.result.points.length) { setView('iso'); state.firstFit = false; }
@@ -436,7 +436,9 @@
     var s = state.result.summary, m = state.mpf.stats;
     var shown = state.visible.length;
     el.innerHTML =
-      'FPDF: <b>' + s.total + '</b> nokta &nbsp;·&nbsp; MPF: <b>' + m.positions + '</b> pozisyon, <b>' + m.processes + '</b> proses<br>' +
+      'FPDF: <b>' + s.total + '</b> nokta' + (state.docs.fpdf.length > 1 ? ' (' + state.docs.fpdf.length + ' dosya)' : '') +
+      ' &nbsp;·&nbsp; MPF: <b>' + m.positions + '</b> pozisyon, <b>' + m.processes + '</b> proses' +
+      (state.docs.mpf.length > 1 ? ' (' + state.docs.mpf.length + ' dosya)' : '') + '<br>' +
       'MPF ile eşleşen: <b>' + s.inMpf + '</b> &nbsp;·&nbsp; MPF\'de yok: <b>' + s.notInMpf + '</b> &nbsp;·&nbsp; FPDF\'de olmayan isim: <b>' + state.result.unmatched.length + '</b>' +
       ' &nbsp;·&nbsp; Kural ihlali: <b style="color:' + (s.withIssues ? 'var(--warn)' : 'inherit') + '">' + s.withIssues + '</b><br>' +
       'Gösterilen: <b>' + shown + '</b>';
@@ -519,7 +521,7 @@
       '<tr><td>FPDF proses</td><td>' + esc(p.fpdfProc) + '</td></tr>' +
       '<tr><td>Bağlayıcı tipi</td><td>' + esc(p.type) + '</td></tr>' +
       '<tr><td>X / Y / Z</td><td>' + fmt(p.x) + ' / ' + fmt(p.y) + ' / ' + fmt(p.z) + '</td></tr>' +
-      '<tr><td>FPDF satırı</td><td>' + p.line + '</td></tr>' +
+      '<tr><td>FPDF satırı</td><td>' + esc(loc(p)) + '</td></tr>' +
       '<tr><td>MPF pozisyon</td><td>' + p.positionCount + ' kez</td></tr>' +
       '<tr><td>PSEN</td><td>' + (p.hasPsen ? 'Var' : 'Yok') + '</td></tr>' +
       '<tr><td>Tekil proses</td><td>' + esc(excl) + '</td></tr>' +
@@ -529,13 +531,13 @@
     // MPF'deki makine ekseni pozisyonları (3D görünüm FPDF tasarım eksenini kullanır)
     p.blocks.forEach(function (b) {
       if (!b.machine) return;
-      html += '<div class="muted" style="font-size:11px">Makine ' + esc(b.keyword) + ' (satır ' + b.line + '): ' +
+      html += '<div class="muted" style="font-size:11px">Makine ' + esc(b.keyword) + ' (' + esc(loc(b)) + '): ' +
         b.machine.map(fmt).join(', ') + '</div>';
     });
     if (p.processes.length) {
       html += '<div class="muted" style="margin-top:8px">MPF prosesleri</div>';
       p.processes.forEach(function (pr) {
-        html += '<div class="proc"><b>' + esc(pr.code + (pr.args !== '' ? '(' + pr.args + ')' : '')) + '</b> <span class="muted">satır ' + pr.line +
+        html += '<div class="proc"><b>' + esc(pr.code + (pr.args !== '' ? '(' + pr.args + ')' : '')) + '</b> <span class="muted">' + esc(loc(pr)) +
           (pr.blockLine ? ' (pozisyon satır ' + pr.blockLine + ')' : '') + '</span><br><code>' + esc(pr.text) + '</code></div>';
       });
     } else if (!p.inMpf) {
@@ -691,10 +693,10 @@
       $('drawerTitle').textContent = 'Uyarılar';
       var ws = state.warnings.filter(function (w) { return !q || (w.msg + ' ' + (w.text || '')).toUpperCase().indexOf(q) >= 0; });
       $('drawerInfo').textContent = ws.length + ' uyarı';
-      var h = '<table><thead><tr><th>Tür</th><th>Satır</th><th>Mesaj</th><th>Satır içeriği</th></tr></thead><tbody>';
+      var h = '<table><thead><tr><th>Tür</th><th>' + (multiFiles() ? 'Dosya:satır' : 'Satır') + '</th><th>Mesaj</th><th>Satır içeriği</th></tr></thead><tbody>';
       ws.slice(0, LIMIT).forEach(function (w, i) {
         h += '<tr class="' + (w.name ? 'clickable' : '') + '" data-w="' + i + '"><td>' + esc(warnLabel(w.type)) + '</td><td class="num">' +
-          (w.line || '') + '</td><td>' + esc(w.msg) + '</td><td class="muted">' + esc(w.text || '') + '</td></tr>';
+          esc(w.line ? (multiFiles() && w.file ? w.file + ':' : '') + w.line : '') + '</td><td>' + esc(w.msg) + '</td><td class="muted">' + esc(w.text || '') + '</td></tr>';
       });
       body.innerHTML = h + '</tbody></table>';
       body._ws = ws;
@@ -742,10 +744,10 @@
   // ------------------------------------------------------------------ FPDF önizleme
   function updatePreview() {
     var el = $('fpdfPreview');
-    if (!state.text.fpdf) { el.innerHTML = ''; return; }
+    if (!state.docs.fpdf.length) { el.innerHTML = ''; return; }
     var cfg = state.settings.fpdf;
     var delim = cfg.delimiter === '\\t' ? '\t' : (cfg.delimiter || ',');
-    var lines = state.text.fpdf.split(/\r\n|\r|\n/).filter(function (l) { l = l.trim(); return l && l.indexOf(cfg.commentPrefix) !== 0; }).slice(0, 5);
+    var lines = state.docs.fpdf[0].text.split(/\r\n|\r|\n/).filter(function (l) { l = l.trim(); return l && l.indexOf(cfg.commentPrefix) !== 0; }).slice(0, 5);
     if (!lines.length) { el.innerHTML = ''; return; }
     var rows = lines.map(function (l) { return l.trim().split(delim); });
     var n = Math.max.apply(null, rows.map(function (r) { return r.length; }));
@@ -902,34 +904,78 @@
   }
 
   // ------------------------------------------------------------------ dosya yükleme
-  function readText(kind) {
-    var f = state.files[kind];
-    if (!f) return;
-    var r = new FileReader();
-    r.onload = function () {
-      state.text[kind] = r.result;
-      state.names[kind] = f.name;
-      var lbl = $(kind === 'fpdf' ? 'lblFpdf' : 'lblMpf');
-      lbl.textContent = f.name;
-      lbl.className = 'fname ok';
-      process();
-    };
-    r.readAsText(f, $('encoding').value);
-  }
-  function setFile(kind, f) { state.files[kind] = f; if (kind === 'fpdf') state.firstFit = true; readText(kind); }
+  // FPDF ve MPF'den birden fazla dosya yüklenebilir; hepsi birlikte işlenir.
+  // Aynı adla yeniden yüklenen dosya eskisinin yerine geçer.
+  function multiFiles() { return state.docs.fpdf.length > 1 || state.docs.mpf.length > 1; }
+  function loc(o) { return (multiFiles() && o.file ? o.file + ':' : 'satır ') + o.line; }
 
-  $('inFpdf').onchange = function (e) { if (e.target.files[0]) setFile('fpdf', e.target.files[0]); e.target.value = ''; };
-  $('inMpf').onchange = function (e) { if (e.target.files[0]) setFile('mpf', e.target.files[0]); e.target.value = ''; };
+  function readOne(f) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(r.result); };
+      r.onerror = function () { reject(new Error(f.name + ' okunamadı')); };
+      r.readAsText(f, $('encoding').value);
+    });
+  }
+
+  function addFiles(kind, files) {
+    files = Array.prototype.slice.call(files);
+    if (!files.length) return;
+    Promise.all(files.map(readOne)).then(function (texts) {
+      if (kind === 'fpdf' && !state.docs.fpdf.length) state.firstFit = true;
+      files.forEach(function (f, i) {
+        var list = state.docs[kind];
+        var doc = { name: f.name, text: texts[i], file: f };
+        var at = list.findIndex(function (d) { return d.name === f.name; });
+        if (at >= 0) list[at] = doc; else list.push(doc);
+      });
+      process();
+    }).catch(function (err) { alert(err.message); });
+  }
+
+  function removeFile(kind, idx) {
+    state.docs[kind].splice(idx, 1);
+    if (!state.docs.fpdf.length) state.firstFit = true;
+    process();
+  }
+
+  function renderFileLists() {
+    ['fpdf', 'mpf'].forEach(function (kind) {
+      var el = $(kind === 'fpdf' ? 'listFpdf' : 'listMpf'), docs = state.docs[kind];
+      if (!docs.length) { el.innerHTML = '<span class="fname">—</span>'; return; }
+      el.innerHTML = docs.map(function (d, i) {
+        return '<div class="fitem"><span class="fname ok" title="' + esc(d.name) + '">' + esc(d.name) + '</span>' +
+          '<button class="x" data-kind="' + kind + '" data-i="' + i + '" title="Kaldır">×</button></div>';
+      }).join('') + (docs.length > 1 ? '<div class="fcount">' + docs.length + ' dosya</div>' : '');
+      el.querySelectorAll('button.x').forEach(function (b) {
+        b.onclick = function () { removeFile(b.getAttribute('data-kind'), +b.getAttribute('data-i')); };
+      });
+    });
+  }
+
+  $('inFpdf').onchange = function (e) { addFiles('fpdf', e.target.files); e.target.value = ''; };
+  $('inMpf').onchange = function (e) { addFiles('mpf', e.target.files); e.target.value = ''; };
   $('inModel').onchange = function (e) { if (e.target.files[0]) loadModelFile(e.target.files[0]); e.target.value = ''; };
-  $('encoding').onchange = function () { readText('fpdf'); readText('mpf'); };
+  // Kodlama değişince diskten yüklenmiş dosyaları yeniden oku
+  $('encoding').onchange = function () {
+    var jobs = [];
+    ['fpdf', 'mpf'].forEach(function (kind) {
+      state.docs[kind].forEach(function (d) {
+        if (d.file) jobs.push(readOne(d.file).then(function (t) { d.text = t; }));
+      });
+    });
+    Promise.all(jobs).then(process).catch(function (err) { alert(err.message); });
+  };
 
   function routeFile(f) {
     var ext = f.name.split('.').pop().toLowerCase();
-    if (ext === 'fpdf') setFile('fpdf', f);
-    else if (ext === 'mpf' || ext === 'spf') setFile('mpf', f);
-    else if (MODEL_EXTS.indexOf(ext) >= 0) loadModelFile(f);
+    if (MODEL_EXTS.indexOf(ext) >= 0) loadModelFile(f);
     else if (ext === 'json') readSettingsFile(f);
     else alert('"' + f.name + '" için dosya türü anlaşılamadı. Lütfen sol paneldeki düğmeleri kullanın.');
+  }
+  function fileKind(f) {
+    var ext = f.name.split('.').pop().toLowerCase();
+    return ext === 'fpdf' ? 'fpdf' : (ext === 'mpf' || ext === 'spf') ? 'mpf' : null;
   }
   var dragDepth = 0;
   window.addEventListener('dragenter', function (e) { e.preventDefault(); dragDepth++; $('dropHint').hidden = false; });
@@ -937,17 +983,20 @@
   window.addEventListener('dragover', function (e) { e.preventDefault(); });
   window.addEventListener('drop', function (e) {
     e.preventDefault(); dragDepth = 0; $('dropHint').hidden = true;
-    Array.prototype.forEach.call(e.dataTransfer.files, routeFile);
+    var byKind = { fpdf: [], mpf: [] };
+    Array.prototype.forEach.call(e.dataTransfer.files, function (f) {
+      var k = fileKind(f);
+      if (k) byKind[k].push(f); else routeFile(f);
+    });
+    addFiles('fpdf', byKind.fpdf);
+    addFiles('mpf', byKind.mpf);
   });
 
   // Örnek veri (ornek/ornek-data.js içine gömülü; file:// altında fetch çalışmadığı için)
   $('btnDemo').onclick = function () {
     var D = window.ORNEK_VERI;
     if (!D) { alert('Örnek veri bulunamadı'); return; }
-    state.text.fpdf = D.fpdf; state.text.mpf = D.mpf;
-    state.names = { fpdf: 'ornek.fpdf', mpf: 'ornek.mpf' };
-    $('lblFpdf').textContent = 'ornek.fpdf'; $('lblFpdf').className = 'fname ok';
-    $('lblMpf').textContent = 'ornek.mpf'; $('lblMpf').className = 'fname ok';
+    state.docs = { fpdf: [{ name: 'ornek.fpdf', text: D.fpdf }], mpf: [{ name: 'ornek.mpf', text: D.mpf }] };
     state.firstFit = true;
     process();
     if (D.stlBase64) {
@@ -969,23 +1018,23 @@
     v = String(v == null ? '' : v);
     return /[;"\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }
-  function baseName() { return (state.names.fpdf || 'proses').replace(/\.[^.]+$/, ''); }
+  function baseName() { return (state.docs.fpdf.length ? state.docs.fpdf[0].name : 'proses').replace(/\.[^.]+$/, ''); }
 
   $('btnCsv').onclick = function () {
     if (!state.result) return;
-    var rows = [['Baglayici', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
+    var rows = [['Baglayici', 'FPDF_Dosya', 'Tip', 'FPDF_Proses', 'X', 'Y', 'Z', 'FPDF_Satir', 'MPF_Pozisyon', 'PSEN', 'Tekil_Proses', 'Kombinasyon', 'MPF_Prosesler', 'Uyari']];
     state.result.points.forEach(function (p) {
-      rows.push([p.name, p.type, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.hasPsen ? 1 : 0, p.exclusive.join(','), p.combo,
-        p.processes.map(function (x) { return x.code + '@' + x.line; }).join(' '), p.issues.join(' | ')]);
+      rows.push([p.name, p.file, p.type, p.fpdfProc, p.x, p.y, p.z, p.line, p.positionCount, p.hasPsen ? 1 : 0, p.exclusive.join(','), p.combo,
+        p.processes.map(function (x) { return x.code + '@' + loc(x).replace('satır ', ''); }).join(' '), p.issues.join(' | ')]);
     });
     state.result.unmatched.forEach(function (u) {
-      rows.push([u.name, '', '', '', '', '', '', '', '', '', 'FPDF\'de yok', u.processes.map(function (x) { return x.code + '@' + x.line; }).join(' '), 'FPDF\'de yok']);
+      rows.push([u.name, '', '', '', '', '', '', '', '', '', '', 'FPDF\'de yok', u.processes.map(function (x) { return x.code + '@' + loc(x).replace('satır ', ''); }).join(' '), 'FPDF\'de yok']);
     });
     download(baseName() + '_noktalar.csv', '\uFEFF' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'), 'text/csv');
   };
   $('btnWarnCsv').onclick = function () {
-    var rows = [['Tur', 'Satir', 'Mesaj', 'Icerik']];
-    state.warnings.forEach(function (w) { rows.push([warnLabel(w.type), w.line || '', w.msg, w.text || '']); });
+    var rows = [['Tur', 'Dosya', 'Satir', 'Mesaj', 'Icerik']];
+    state.warnings.forEach(function (w) { rows.push([warnLabel(w.type), w.file || '', w.line || '', w.msg, w.text || '']); });
     download(baseName() + '_uyarilar.csv', '\uFEFF' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'), 'text/csv');
   };
 
@@ -1001,7 +1050,8 @@
       shapeCounts[k] = (shapeCounts[k] || 0) + 1;
     });
     var lines = [];
-    var meta = [state.names.fpdf, state.names.mpf].filter(Boolean).join(' · ');
+    var metaOf = function (docs, kind) { return docs.length > 1 ? docs.length + ' ' + kind : docs.length ? docs[0].name : ''; };
+    var meta = [metaOf(state.docs.fpdf, 'FPDF'), metaOf(state.docs.mpf, 'MPF')].filter(Boolean).join(' · ');
     var when = state.shared ? new Date(state.shared.created) : new Date();
     var modeLabel = MODES.filter(function (m) { return m.key === state.viewMode; })[0].label;
     lines.push({ kind: 'title', label: $('mapTitle').value.trim() || 'Proses haritası' });
@@ -1186,7 +1236,10 @@
     return {
       app: 'proses3d', v: 1, created: new Date().toISOString(),
       viewerOnly: $('shareViewer').checked,
-      names: state.names, fpdf: state.text.fpdf, mpf: state.text.mpf,
+      docs: {
+        fpdf: state.docs.fpdf.map(function (d) { return { name: d.name, text: d.text }; }),
+        mpf: state.docs.mpf.map(function (d) { return { name: d.name, text: d.text }; })
+      },
       settings: state.settings, inputs: inputs,
       hiddenShapes: state.hiddenShapes, hiddenColors: state.hiddenColors,
       camera: { position: camera.position.toArray(), target: controls.target.toArray() },
@@ -1227,13 +1280,14 @@
     state.viewMode = MODES.some(function (m) { return m.key === $('viewMode').value; }) ? $('viewMode').value : 'both';
     $('viewMode').value = state.viewMode;
     helpers.visible = $('chkAxes').checked;
-    state.text.fpdf = d.fpdf || '';
-    state.text.mpf = d.mpf || '';
-    state.names = d.names || { fpdf: '', mpf: '' };
-    [['lblFpdf', state.names.fpdf], ['lblMpf', state.names.mpf]].forEach(function (x) {
-      $(x[0]).textContent = x[1] || '—';
-      $(x[0]).className = 'fname' + (x[1] ? ' ok' : '');
-    });
+    if (d.docs) state.docs = { fpdf: d.docs.fpdf || [], mpf: d.docs.mpf || [] };
+    else { // tek dosyalı eski paylaşım biçimi
+      var nm = d.names || {};
+      state.docs = {
+        fpdf: d.fpdf ? [{ name: nm.fpdf || 'harita.fpdf', text: d.fpdf }] : [],
+        mpf: d.mpf ? [{ name: nm.mpf || 'harita.mpf', text: d.mpf }] : []
+      };
+    }
     state.hiddenShapes = d.hiddenShapes || {};
     state.hiddenColors = d.hiddenColors || {};
     state.firstFit = false;

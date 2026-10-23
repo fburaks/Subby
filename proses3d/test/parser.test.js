@@ -101,3 +101,28 @@ assert.strictEqual(P.match(P.parseFPDF('A,Fst-1959,1,2,3\n'), rm).points[0].inMp
 assert.strictEqual(P.match(P.parseFPDF('A,POINT_NO--FST-1959,1,2,3\n'), rm).points[0].inMpf, false);
 
 console.log('gerçek biçim testleri geçti');
+
+// Birden fazla FPDF ve MPF dosyası
+var mf = P.parseFPDFFiles([
+  { name: 'a.fpdf', text: 'T1,N1,0,0,0\nT1,N2,1,0,0\n' },
+  { name: 'b.fpdf', text: 'T2,N3,2,0,0\n' }
+]);
+assert.strictEqual(mf.points.length, 3);
+assert.deepStrictEqual(mf.points.map(function (p) { return p.id; }), [0, 1, 2]);
+assert.strictEqual(mf.points[2].file, 'b.fpdf');
+var mm = P.parseMPFFiles([
+  { name: 'r1.mpf', text: 'AXPOS(1) ;N1\nPSEN(1)\nAXPOS(2) ;N3\nCS(1)\n' },
+  { name: 'r2.mpf', text: 'LIN(1) ;N1\nDONLY(1)\nLIN(2) ;N2\nPSEN(1)\n' }
+]);
+assert.strictEqual(mm.blocks.length, 4);
+assert.strictEqual(mm.processes[2].blockIndex, 2);
+assert.strictEqual(mm.processes[2].file, 'r2.mpf');
+var mr = P.match(mf, mm), mb = {};
+mr.points.forEach(function (p) { mb[p.name] = p; });
+assert.strictEqual(mb.N1.positionCount, 2);
+assert.strictEqual(mb.N1.blockCount, 2);
+assert.deepStrictEqual(mb.N1.exclusive, ['DONLY']);
+assert.strictEqual(mb.N1.hasPsen, true);
+assert.strictEqual(mb.N2.combo, 'PSEN');
+assert.strictEqual(mb.N3.combo, 'CS');
+console.log('çoklu dosya testleri geçti');

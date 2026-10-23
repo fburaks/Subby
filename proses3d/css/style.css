@@ -53,6 +53,13 @@ code { background: var(--panel-2); padding: 0 4px; border-radius: 3px; }
 .filerow .btn { width: 100px; justify-content: center; }
 .fname { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .fname.ok { color: var(--ok); }
+.filerow:has(.filelist) { align-items: flex-start; }
+.filelist { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 5px; }
+.fitem { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.fitem .fname { flex: 1; }
+.fitem .x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+.fitem .x:hover { color: var(--warn); }
+.fcount { color: var(--muted); font-size: 11px; }
 .badge { background: var(--warn); color: #fff; border-radius: 9px; padding: 0 6px; font-size: 11px; }
 .badge.zero { background: var(--line); }
 .muted { color: var(--muted); }
