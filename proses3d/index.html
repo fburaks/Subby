@@ -121,8 +121,9 @@
       <div class="row"><button id="btnShare" class="btn primary">Haritayı kaydet (HTML)</button></div>
       <div class="row"><button id="btnPng" class="btn">Görüntü (PNG)</button></div>
       <div class="row"><button id="btnCsv" class="btn">Nokta listesi (CSV)</button></div>
-      <p class="hint">CATIA: haritada görünen noktalar, seçili modun renk ve sembolleriyle aktarılır. Python betiğini CSV ile çalıştırın: <code>python proses3d_catia.py dosya_catia.csv</code></p>
-      <div class="row"><button id="btnCatiaCsv" class="btn">CATIA CSV</button><button id="btnCatiaPy" class="btn">CATIA Python betiği</button></div>
+      <p class="hint">CATIA: haritada görünen noktalar, seçili modun renk ve sembolleriyle aktarılır. Önce <b>CATIA CSV</b>'yi kaydedin. Ardından CATIA'da <code>Alt+F8</code> ile <b>CATScript</b> makrosunu çalıştırıp CSV'yi seçin (Python gerekmez). Python betiği çift tıklanınca da CSV sorar.</p>
+      <div class="row"><button id="btnCatiaCsv" class="btn">CATIA CSV</button></div>
+      <div class="row"><button id="btnCatiaVbs" class="btn">CATIA makrosu (CATScript)</button><button id="btnCatiaPy" class="btn">Python betiği</button></div>
       <div class="row"><button id="btnWarnCsv" class="btn">Uyarılar (CSV)</button></div>
     </details>
 
@@ -186,6 +187,7 @@
 <script src="js/parser.js"></script>
 <script src="ornek/ornek-data.js"></script>
 <script type="text/plain" id="catiaPy" data-src="catia/proses3d_catia.py"></script>
+<script type="text/plain" id="catiaVbs" data-src="catia/Proses3D_CATIA.CATScript"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

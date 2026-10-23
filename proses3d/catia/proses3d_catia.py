@@ -7,20 +7,22 @@ Part dokümanına renk ve sembolleriyle birlikte aktarır.
 
 Gereksinimler (Windows):
     - CATIA V5 açık olmalı
-    - Python 3 ve pywin32:  pip install pywin32
+    - Python 3 ve pywin32:  py -m pip install pywin32
 
 Kullanım:
-    python proses3d_catia.py harita_catia.csv           -> aktif Part dokümanına aktarır
-    python proses3d_catia.py harita_catia.csv --yeni    -> yeni bir Part oluşturup oraya aktarır
-    python proses3d_catia.py --sembol-testi             -> CATIA sembol numaralarını gösteren test noktaları
+    Çift tıklama                                       -> CSV dosyası seçme penceresi açılır
+    py proses3d_catia.py harita_catia.csv              -> aktif Part dokümanına aktarır
+    py proses3d_catia.py harita_catia.csv --yeni       -> yeni bir Part oluşturup oraya aktarır
+    py proses3d_catia.py --sembol-testi                -> CATIA sembol numaralarını gösteren test noktaları
+
+Python kurulu değilse aynı işi CATIA içinden çalışan Proses3D_CATIA.CATScript makrosu yapar.
 
 Yapı: "Proses3D_<başlık>" adlı bir geometrik set ve içinde her kategori için bir alt set oluşturulur.
 Nokta adları: <nokta adı>,<bağlayıcı tipi>,<proses>
 """
 import csv
 import sys
-
-import win32com.client
+import traceback
 
 # Proses 3D şekil adı -> CATIA nokta sembolü (VisPropertySet.SetSymbolType numarası).
 # Numaraların karşılığı CATIA sürümüne göre değişebilir. Emin olmak için önce
@@ -39,31 +41,86 @@ SEMBOLLER = {
 VARSAYILAN_SEMBOL = 7
 
 
-def catia_baglan():
+class Hata(Exception):
+    """Kullanıcıya gösterilecek, açıklaması belli hata."""
+
+
+def win32_yukle():
     try:
-        return win32com.client.GetActiveObject('CATIA.Application')
-    except Exception:
-        sys.exit('CATIA bulunamadı. Önce CATIA V5\'i açın.')
+        import win32com.client
+    except ImportError:
+        raise Hata('pywin32 kurulu değil. Komut isteminde şunu çalıştırın:\n'
+                   '    py -m pip install pywin32\n'
+                   '(İnternet yoksa Proses3D_CATIA.CATScript makrosunu kullanın.)')
+    return win32com.client
+
+
+def catia_baglan():
+    client = win32_yukle()
+    print('CATIA\'ya bağlanılıyor...')
+    try:
+        catia = client.GetActiveObject('CATIA.Application')
+    except Exception as e:
+        raise Hata('Açık bir CATIA V5 bulunamadı (%s).\n'
+                   'CATIA\'yı açın. CATIA yönetici olarak çalışıyorsa bu betiği de yönetici olarak çalıştırın.' % e)
+    print('  CATIA bulundu.')
+    return catia
 
 
 def part_al(catia, yeni):
-    if yeni:
-        return catia.Documents.Add('Part').Part
-    try:
-        doc = catia.ActiveDocument
-    except Exception:
-        doc = None
-    if doc is None or not doc.Name.lower().endswith('.catpart'):
-        sys.exit('Aktif doküman bir CATPart değil. Part dokümanını açın veya --yeni kullanın.')
+    if not yeni:
+        try:
+            doc = catia.ActiveDocument
+        except Exception:
+            doc = None
+        if doc is not None and doc.Name.lower().endswith('.catpart'):
+            print('  Aktif doküman: %s' % doc.Name)
+            return doc.Part
+        ad = doc.Name if doc is not None else '(açık doküman yok)'
+        if not evet_mi('Aktif doküman bir CATPart değil: %s\nYeni bir Part oluşturulsun mu?' % ad):
+            raise Hata('İptal edildi. Hedef CATPart\'ı açıp tekrar çalıştırın.')
+    doc = catia.Documents.Add('Part')
+    print('  Yeni Part oluşturuldu: %s' % doc.Name)
     return doc.Part
 
 
+def evet_mi(soru):
+    try:
+        from tkinter import Tk, messagebox
+        kok = Tk()
+        kok.withdraw()
+        cevap = messagebox.askyesno('Proses 3D -> CATIA', soru)
+        kok.destroy()
+        return cevap
+    except Exception:
+        return input(soru + ' [e/h] ').strip().lower().startswith('e')
+
+
+def csv_sec():
+    try:
+        from tkinter import Tk, filedialog
+        kok = Tk()
+        kok.withdraw()
+        yol = filedialog.askopenfilename(title='Proses 3D CATIA CSV dosyasını seçin',
+                                         filetypes=[('CATIA CSV', '*.csv'), ('Tüm dosyalar', '*.*')])
+        kok.destroy()
+        return yol
+    except Exception:
+        return input('CSV dosyasının yolu: ').strip().strip('"')
+
+
 def csv_oku(yol):
-    with open(yol, newline='', encoding='utf-8-sig') as f:
-        satirlar = list(csv.DictReader(f, delimiter=';'))
+    print('CSV okunuyor: %s' % yol)
+    try:
+        with open(yol, newline='', encoding='utf-8-sig') as f:
+            satirlar = list(csv.DictReader(f, delimiter=';'))
+    except OSError as e:
+        raise Hata('CSV açılamadı: %s' % e)
     gerekli = {'Ad', 'X', 'Y', 'Z', 'R', 'G', 'B', 'Sekil', 'Grup'}
     if not satirlar or not gerekli.issubset(satirlar[0].keys()):
-        sys.exit('CSV biçimi tanınmadı. Dosyayı Proses 3D\'deki "CATIA CSV" düğmesiyle kaydedin.')
+        raise Hata('CSV biçimi tanınmadı. Dosyayı Proses 3D\'deki "CATIA CSV" düğmesiyle kaydedin '
+                   '("Nokta listesi (CSV)" farklı bir dosyadır).')
+    print('  %d nokta okundu.' % len(satirlar))
     return satirlar
 
 
@@ -95,7 +152,7 @@ def aktar(csv_yolu, yeni=False):
             gruplar[g] = {'set': alt, 'noktalar': [], 'renk': (int(s['R']), int(s['G']), int(s['B'])),
                           'sembol': SEMBOLLER.get(s['Sekil'], VARSAYILAN_SEMBOL)}
 
-    print('%d nokta, %d grup aktarılıyor...' % (len(satirlar), len(gruplar)))
+    print('%d nokta, %d grup oluşturuluyor...' % (len(satirlar), len(gruplar)))
     for i, s in enumerate(satirlar, 1):
         g = gruplar[s['Grup']]
         nokta = hsf.AddNewPointCoord(float(s['X']), float(s['Y']), float(s['Z']))
@@ -104,9 +161,11 @@ def aktar(csv_yolu, yeni=False):
         g['noktalar'].append(nokta)
         if i % 500 == 0:
             print('  %d / %d' % (i, len(satirlar)))
+    print('Part güncelleniyor...')
     part.Update()
 
     # Renk ve sembolü her grup için tek seçimle uygula
+    print('Renk ve semboller uygulanıyor...')
     sel = doc.Selection
     for ad, g in gruplar.items():
         sel.Clear()
@@ -117,7 +176,7 @@ def aktar(csv_yolu, yeni=False):
         vis.SetSymbolType(g['sembol'])
         print('  %-28s %5d nokta  RGB%s  sembol %d' % (ad, len(g['noktalar']), g['renk'], g['sembol']))
     sel.Clear()
-    print('Tamamlandı: "%s"' % ana_set.Name)
+    print('Tamamlandı: "%s" geometrik seti, %d nokta.' % (ana_set.Name, len(satirlar)))
 
 
 def sembol_testi():
@@ -143,11 +202,30 @@ def sembol_testi():
     print('Sembol_1 ... Sembol_13 noktaları oluşturuldu. SEMBOLLER tablosunu buna göre düzenleyin.')
 
 
-if __name__ == '__main__':
-    argv = sys.argv[1:]
+def main(argv):
+    dosyalar = [a for a in argv if not a.startswith('--')]
     if '--sembol-testi' in argv:
         sembol_testi()
-    elif not [a for a in argv if not a.startswith('--')]:
-        print(__doc__)
-    else:
-        aktar([a for a in argv if not a.startswith('--')][0], yeni='--yeni' in argv)
+        return
+    if not dosyalar:
+        # Çift tıklamayla açıldı: dosya seçtir
+        yol = csv_sec()
+        if not yol:
+            raise Hata('CSV dosyası seçilmedi.')
+        dosyalar = [yol]
+    aktar(dosyalar[0], yeni='--yeni' in argv)
+
+
+if __name__ == '__main__':
+    try:
+        main(sys.argv[1:])
+    except Hata as e:
+        print('\nHATA: %s' % e)
+    except Exception:
+        print('\nBeklenmeyen hata:')
+        traceback.print_exc()
+    # Çift tıklamayla açılan pencere hemen kapanmasın
+    try:
+        input('\nKapatmak için Enter\'a basın...')
+    except EOFError:
+        pass

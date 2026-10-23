@@ -1,0 +1,198 @@
+Language="VBSCRIPT"
+' ---------------------------------------------------------------------------------------
+' Proses 3D -> CATIA V5 makrosu (Python gerektirmez)
+'
+' Proses 3D'nin "CATIA CSV" dugmesiyle kaydedilen dosyadaki noktalari aktif CATPart'a
+' renk ve sembolleriyle birlikte aktarir.
+'
+' Calistirma: CATIA'da hedef CATPart acikken
+'   Tools > Macro > Macros... (Alt+F8) > Macro libraries... > bu dosyanin klasorunu ekleyin
+'   > listeden Proses3D_CATIA.CATScript'i secin > Run
+' Acilan pencereden CSV dosyasini secin.
+'
+' Yapi: "Proses3D_<baslik>" geometrik seti, icinde her renk/sembol grubu icin bir alt set.
+' Nokta adlari: <nokta adi>,<baglayici tipi>,<proses>
+' ---------------------------------------------------------------------------------------
+
+' True yapilirsa CSV yerine 1..13 numarali sembolleri gosteren test noktalari olusturulur
+Const SEMBOL_TESTI = False
+
+' Proses 3D sekil adi -> CATIA SetSymbolType numarasi. Numaralarin karsiligi CATIA surumune
+' gore degisebilir; SEMBOL_TESTI ile kontrol edip gerekirse degistirin.
+Function SembolNo(sekil)
+    Select Case sekil
+        Case "circle":   SembolNo = 7   ' dolu daire
+        Case "square":   SembolNo = 8   ' dolu kare
+        Case "triangle": SembolNo = 9   ' dolu ucgen
+        Case "diamond":  SembolNo = 4   ' ic ice daire
+        Case "star":     SembolNo = 6   ' yildiz
+        Case "ring":     SembolNo = 3   ' bos daire
+        Case "pentagon": SembolNo = 2   ' arti
+        Case "hexagon":  SembolNo = 1   ' carpi
+        Case Else:       SembolNo = 7
+    End Select
+End Function
+
+' Bolgesel ayardan bagimsiz sayi okuma ("12.5" Turkce Windows'ta da 12,5 olur)
+Function Sayi(s)
+    Dim ayrac
+    ayrac = Mid(CStr(1.5), 2, 1)
+    Sayi = CDbl(Replace(Trim(s), ".", ayrac))
+End Function
+
+Function TirnakSil(s)
+    s = Trim(s)
+    If Len(s) >= 2 Then
+        If Left(s, 1) = """" And Right(s, 1) = """" Then s = Replace(Mid(s, 2, Len(s) - 2), """""", """")
+    End If
+    TirnakSil = s
+End Function
+
+Function GuvenliAd(s)
+    Dim c
+    For Each c In Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+        s = Replace(s, c, "_")
+    Next
+    s = Trim(s)
+    If s = "" Then s = "Nokta"
+    GuvenliAd = s
+End Function
+
+Function HedefPart()
+    Dim doc
+    Set doc = Nothing
+    On Error Resume Next
+    Set doc = CATIA.ActiveDocument
+    On Error GoTo 0
+    If Not doc Is Nothing Then
+        If TypeName(doc) = "PartDocument" Then
+            Set HedefPart = doc.Part
+            Exit Function
+        End If
+    End If
+    If MsgBox("Aktif dokuman bir CATPart degil. Yeni bir Part olusturulsun mu?", vbYesNo + vbQuestion, "Proses 3D") <> vbYes Then
+        Set HedefPart = Nothing
+        Exit Function
+    End If
+    Set HedefPart = CATIA.Documents.Add("Part").Part
+End Function
+
+Sub SembolTesti()
+    Dim part, hsf, hb, p, n, sel
+    Set part = CATIA.Documents.Add("Part").Part
+    Set hsf = part.HybridShapeFactory
+    Set hb = part.HybridBodies.Add()
+    hb.Name = "Sembol_Testi"
+    For n = 1 To 13
+        Set p = hsf.AddNewPointCoord(n * 10, 0, 0)
+        hb.AppendHybridShape p
+        p.Name = "Sembol_" & n
+    Next
+    part.Update
+    Set sel = part.Parent.Selection
+    For n = 1 To 13
+        sel.Clear
+        sel.Add hb.HybridShapes.Item(n)
+        sel.VisProperties.SetSymbolType n
+    Next
+    sel.Clear
+    MsgBox "Sembol_1 ... Sembol_13 olusturuldu. SembolNo tablosunu buna gore duzenleyin.", vbInformation, "Proses 3D"
+End Sub
+
+Sub CATMain()
+    If SEMBOL_TESTI Then
+        SembolTesti
+        Exit Sub
+    End If
+
+    Dim yol
+    yol = CATIA.FileSelectionBox("Proses 3D CATIA CSV dosyasini secin", "*.csv", 0)
+    If yol = "" Then Exit Sub
+
+    ' CSV UTF-8 kaydedildigi icin ADODB.Stream ile okunur (FileSystemObject UTF-8 okuyamaz)
+    Dim st, metin
+    Set st = CreateObject("ADODB.Stream")
+    st.Type = 2
+    st.Charset = "utf-8"
+    st.Open
+    st.LoadFromFile yol
+    metin = st.ReadText
+    st.Close
+    If Left(metin, 1) = ChrW(&HFEFF) Then metin = Mid(metin, 2)
+    metin = Replace(metin, vbCrLf, vbLf)
+    metin = Replace(metin, vbCr, vbLf)
+
+    Dim satirlar, baslik, kol, i
+    satirlar = Split(metin, vbLf)
+    baslik = Split(satirlar(0), ";")
+    Set kol = CreateObject("Scripting.Dictionary")
+    For i = 0 To UBound(baslik)
+        kol(TirnakSil(baslik(i))) = i
+    Next
+    Dim k
+    For Each k In Array("Ad", "X", "Y", "Z", "R", "G", "B", "Sekil", "Grup")
+        If Not kol.Exists(k) Then
+            MsgBox "CSV bicimi taninmadi (" & k & " sutunu yok)." & vbCrLf & _
+                   "Dosyayi Proses 3D'deki 'CATIA CSV' dugmesiyle kaydedin.", vbExclamation, "Proses 3D"
+            Exit Sub
+        End If
+    Next
+
+    Dim part
+    Set part = HedefPart()
+    If part Is Nothing Then Exit Sub
+    Dim hsf, kok, gruplar, alanlar, g, bilgi, hb, nokta, adet, harita
+    Set hsf = part.HybridShapeFactory
+    Set gruplar = CreateObject("Scripting.Dictionary")
+
+    harita = "Harita"
+    adet = 0
+    Set kok = Nothing
+    For i = 1 To UBound(satirlar)
+        If Trim(satirlar(i)) <> "" Then
+            alanlar = Split(satirlar(i), ";")
+            If kok Is Nothing Then
+                If kol.Exists("Harita") Then
+                    If UBound(alanlar) >= kol("Harita") Then harita = TirnakSil(alanlar(kol("Harita")))
+                End If
+                Set kok = part.HybridBodies.Add()
+                kok.Name = GuvenliAd("Proses3D_" & harita)
+            End If
+            g = TirnakSil(alanlar(kol("Grup")))
+            If Not gruplar.Exists(g) Then
+                Set hb = kok.HybridBodies.Add()
+                hb.Name = GuvenliAd(g)
+                gruplar.Add g, Array(hb, CInt(alanlar(kol("R"))), CInt(alanlar(kol("G"))), CInt(alanlar(kol("B"))), _
+                                     SembolNo(TirnakSil(alanlar(kol("Sekil")))))
+            End If
+            bilgi = gruplar(g)
+            Set nokta = hsf.AddNewPointCoord(Sayi(alanlar(kol("X"))), Sayi(alanlar(kol("Y"))), Sayi(alanlar(kol("Z"))))
+            bilgi(0).AppendHybridShape nokta
+            nokta.Name = GuvenliAd(TirnakSil(alanlar(kol("Ad"))))
+            adet = adet + 1
+        End If
+    Next
+    If adet = 0 Then
+        MsgBox "CSV dosyasinda nokta yok.", vbExclamation, "Proses 3D"
+        Exit Sub
+    End If
+    part.Update
+
+    ' Renk ve sembolu her grubun noktalarini birlikte secerek uygula
+    Dim sel, vis, j
+    Set sel = part.Parent.Selection
+    For Each g In gruplar.Keys
+        bilgi = gruplar(g)
+        Set hb = bilgi(0)
+        sel.Clear
+        For j = 1 To hb.HybridShapes.Count
+            sel.Add hb.HybridShapes.Item(j)
+        Next
+        Set vis = sel.VisProperties
+        vis.SetRealColor bilgi(1), bilgi(2), bilgi(3), 1
+        vis.SetSymbolType bilgi(4)
+    Next
+    sel.Clear
+
+    MsgBox adet & " nokta, " & gruplar.Count & " grup aktarildi." & vbCrLf & "Geometrik set: " & kok.Name, vbInformation, "Proses 3D"
+End Sub

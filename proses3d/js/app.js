@@ -1348,11 +1348,14 @@
     download(shareName() + '_catia.csv', '\uFEFF' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'), 'text/csv');
   };
 
-  $('btnCatiaPy').onclick = function () {
-    var src = $('catiaPy').textContent;
-    if (!src.trim()) { alert('Python betiği bu sürümde gömülü değil; Proses3D.html kullanın veya catia/proses3d_catia.py dosyasını alın.'); return; }
-    download('proses3d_catia.py', src.replace(/^\n/, ''), 'text/x-python');
-  };
+  function downloadEmbedded(id, name) {
+    var src = $(id).textContent;
+    if (!src.trim()) { alert(name + ' bu sürümde gömülü değil; Proses3D.html kullanın veya catia/ klasöründen alın.'); return; }
+    // CATIA makroları Windows satır sonu bekler
+    download(name, src.replace(/^\n/, '').replace(/\r?\n/g, '\r\n'), 'text/plain');
+  }
+  $('btnCatiaPy').onclick = function () { downloadEmbedded('catiaPy', 'proses3d_catia.py'); };
+  $('btnCatiaVbs').onclick = function () { downloadEmbedded('catiaVbs', 'Proses3D_CATIA.CATScript'); };
 
   // ------------------------------------------------------------------ başlat
   resize();

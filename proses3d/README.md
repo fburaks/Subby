@@ -92,21 +92,23 @@ CGR kapalı bir format olduğu için doğrudan okunamaz. CATIA'dan:
 - **CSV**: nokta listesi ve uyarılar.
 
 ## CATIA'ya aktarma
-1. Haritayı istenen moda getirin (gizlenen kategoriler aktarılmaz).
-2. *Kaydet / Paylaş → CATIA CSV* ile `..._catia.csv`, *CATIA Python betiği* ile `proses3d_catia.py` indirin.
-3. CATIA V5'te hedef CATPart'ı açın ve Windows'ta çalıştırın (Python 3 + `pip install pywin32`):
-   ```
-   python proses3d_catia.py Panel_A_harita_catia.csv          (aktif Part'a)
-   python proses3d_catia.py Panel_A_harita_catia.csv --yeni   (yeni Part'a)
-   ```
-4. Sonuç: `Proses3D_<başlık>` geometrik seti, içinde her renk/sembol grubu için bir alt set.
+1. Haritayı istenen moda getirin (gizlenen kategoriler aktarılmaz) ve *Kaydet / Paylaş → CATIA CSV* ile kaydedin.
+2. Aktarım için iki yol var:
+   - **CATScript makrosu (önerilen, kurulum gerekmez):** *CATIA makrosu (CATScript)* ile
+     `Proses3D_CATIA.CATScript` dosyasını indirin. CATIA'da hedef CATPart açıkken
+     *Tools → Macro → Macros…* (`Alt+F8`) → *Macro libraries…* ile dosyanın klasörünü ekleyin,
+     makroyu seçip *Run*'a basın ve CSV'yi seçin.
+   - **Python betiği:** Python 3 ve `py -m pip install pywin32` gerekir. `proses3d_catia.py`'ye çift
+     tıklayın (CSV seçme penceresi açılır) veya `py proses3d_catia.py dosya_catia.csv [--yeni]`.
+     Pencere sonunda açık kalır; hata varsa orada yazar.
+3. Sonuç: `Proses3D_<başlık>` geometrik seti, içinde her renk/sembol grubu için bir alt set.
    Nokta adları `<nokta adı>,<bağlayıcı tipi>,<proses>` (ör. `Point_No--Fst-1962,P20,CS`); bağlayıcı
    isimlerinde tire olabildiği için ayraç virgüldür.
    Proses değerleri: PSEN, CS, DONLY, DNOCLAMP, PROSESYOK, COKLU, MPFYOK.
 
-CATIA'nın sembol numaraları (SetSymbolType) sürüme göre farklı olabilir:
-`python proses3d_catia.py --sembol-testi` 1–13 numaralı sembolleri gösteren test noktaları oluşturur;
-betiğin başındaki `SEMBOLLER` tablosu buna göre düzenlenebilir.
+CATIA'nın sembol numaraları (SetSymbolType) sürüme göre farklı olabilir. Test noktaları için
+makroda `SEMBOL_TESTI = True` yapın veya `py proses3d_catia.py --sembol-testi` çalıştırın;
+1–13 numaralı sembolleri gösteren noktalar oluşur ve tablo (`SembolNo` / `SEMBOLLER`) buna göre düzenlenir.
 
 Fare: sol tuş döndür, sağ tuş kaydır, tekerlek yakınlaştır.
 
