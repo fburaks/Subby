@@ -68,9 +68,10 @@
           <option value="position">Pozisyon satırı (AXPOS/LIN)</option>
           <option value="process">Proses satırı</option>
         </select>
+        <label>Yok sayılan ek</label><input id="cfgIgnore" type="text" title="Eşleştirmede isim sonundan atılan yardımcı kodlar (regex). Boş bırakılırsa kapalı.">
         <label>Harf farkını yok say</label><input id="cfgCI" type="checkbox">
       </div>
-      <p class="hint">İsim, satırdaki <code>;</code> işaretinden sonra gelen metindir (baştaki <code>-</code> atılır). FPDF ve MPF isimleri birebir aynı olmalıdır. <code>N023540 ;PDP(...)</code> gibi yoruma alınmış komutlar yok sayılır. Bir pozisyon satırından sonraki prosesler, bir sonraki pozisyon satırına kadar o bağlayıcıya aittir.</p>
+      <p class="hint">İsim, satırdaki <code>;</code> işaretinden sonra gelen metindir (baştaki <code>-</code> atılır). FPDF ve MPF isimleri birebir aynı olmalıdır; yalnızca sondaki <code>_cn1</code>, <code>_cp12</code> gibi yardımcı kodlar (<i>Yok sayılan ek</i>) atılır. <code>N023540 ;PDP(...)</code> gibi yoruma alınmış komutlar yok sayılır. Bir pozisyon satırından sonraki prosesler, bir sonraki pozisyon satırına kadar o bağlayıcıya aittir.</p>
       <div class="row"><button id="btnApply" class="btn primary">Uygula / Yeniden işle</button><button id="btnReset" class="btn">Varsayılan</button></div>
     </details>
 

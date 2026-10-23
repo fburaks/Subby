@@ -531,7 +531,8 @@
     // MPF'deki makine ekseni pozisyonları (3D görünüm FPDF tasarım eksenini kullanır)
     p.blocks.forEach(function (b) {
       if (!b.machine) return;
-      html += '<div class="muted" style="font-size:11px">Makine ' + esc(b.keyword) + ' (' + esc(loc(b)) + '): ' +
+      html += '<div class="muted" style="font-size:11px">Makine ' + esc(b.keyword) + ' (' + esc(loc(b)) + ')' +
+        (b.name !== p.name ? ' [' + esc(b.name) + ']' : '') + ': ' +
         b.machine.map(fmt).join(', ') + '</div>';
     });
     if (p.processes.length) {
@@ -770,7 +771,8 @@
     ['cfgX', 'fpdf', 'xCol', true], ['cfgY', 'fpdf', 'yCol', true], ['cfgZ', 'fpdf', 'zCol', true],
     ['cfgType', 'fpdf', 'typeCol', 'zero'],
     ['cfgPos', 'mpf', 'positionKeywords'], ['cfgProcKw', 'mpf', 'processKeywords'],
-    ['cfgExcl', 'mpf', 'exclusiveKeywords'], ['cfgRep', 'mpf', 'repeatableKeyword'], ['cfgNameSrc', 'mpf', 'nameSource']
+    ['cfgExcl', 'mpf', 'exclusiveKeywords'], ['cfgRep', 'mpf', 'repeatableKeyword'], ['cfgNameSrc', 'mpf', 'nameSource'],
+    ['cfgIgnore', 'mpf', 'nameIgnorePattern', 'text0']
   ];
   function settingsToForm() {
     FORM.forEach(function (f) { $(f[0]).value = state.settings[f[1]][f[2]]; });
@@ -779,6 +781,7 @@
   function formToSettings() {
     FORM.forEach(function (f) {
       var v = $(f[0]).value;
+      if (f[3] === 'text0') { state.settings[f[1]][f[2]] = v.trim(); return; }
       if (f[3]) { v = parseInt(v, 10); if (!(v >= (f[3] === 'zero' ? 0 : 1))) return; }
       state.settings[f[1]][f[2]] = v;
     });

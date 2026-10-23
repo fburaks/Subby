@@ -126,3 +126,24 @@ assert.strictEqual(mb.N1.hasPsen, true);
 assert.strictEqual(mb.N2.combo, 'PSEN');
 assert.strictEqual(mb.N3.combo, 'CS');
 console.log('çoklu dosya testleri geçti');
+
+// MPF isimlerindeki _cn / _cp yardımcı kodları eşleştirmede yok sayılır
+var sf = P.parseFPDF('A,Point_No--Fst-1962,0,0,0\nB,Point_No--Fst-1963,1,0,0\nC,Point_No--Fst-1964,2,0,0\n');
+var sm = P.parseMPF([
+  'AXPOS(1);- Point_No--Fst-1962_cn1', 'PSEN(1,0)',
+  'AXPOS(2);- Point_No--Fst-1963_cp12', 'DONLY(1)',
+  'AXPOS(3);- Point_No--Fst-1964_cn2_cp3', 'CS(1)',
+  'AXPOS(4);- Point_No--Fst-1962', 'DNOCLAMP(1)'
+].join('\n'));
+var sr = P.match(sf, sm), sb = {};
+sr.points.forEach(function (p) { sb[p.name] = p; });
+assert.strictEqual(sb['Point_No--Fst-1962'].combo, 'PSEN + DNOCLAMP');
+assert.strictEqual(sb['Point_No--Fst-1962'].positionCount, 2);
+assert.strictEqual(sb['Point_No--Fst-1963'].combo, 'DONLY');
+assert.strictEqual(sb['Point_No--Fst-1964'].combo, 'CS');
+assert.strictEqual(sr.unmatched.length, 0);
+// Ek yalnızca sondaysa atılır; başka farklar yine eşleşmez
+assert.strictEqual(P.match(P.parseFPDF('A,Point_No--Fst-196,0,0,0\n'), sm).points[0].inMpf, false);
+// Boş desen: kapalı
+assert.strictEqual(P.match(sf, sm, { mpf: { nameIgnorePattern: '' } }).points[1].inMpf, false);
+console.log('yardımcı ek testleri geçti');

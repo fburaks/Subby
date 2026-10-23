@@ -29,11 +29,16 @@
       exclusiveKeywords: 'CS,DONLY,DNOCLAMP',
       repeatableKeyword: 'PSEN',
       // 'auto' | 'position' | 'process'
-      nameSource: 'auto'
+      nameSource: 'auto',
+      // Eşleştirmede yok sayılacak isim eki (regex). MPF isimlerine eklenebilen yardımcı
+      // kodlar: "Point_No--Fst-1962_cn1", "..._cp12", "..._cn1_cp2" -> "Point_No--Fst-1962"
+      nameIgnorePattern: '(_(cn|cp)\\d*)+$'
     },
     // İsimler birebir eşleşmeli; true yapılırsa büyük/küçük harf farkı yok sayılır
     matchCaseInsensitive: false
   };
+
+  var ALLOW_EMPTY = ['nameIgnorePattern']; // boş bırakılarak kapatılabilen ayarlar
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
@@ -41,7 +46,10 @@
     var out = clone(DEFAULTS);
     if (!s) return out;
     ['fpdf', 'mpf'].forEach(function (k) {
-      if (s[k]) for (var key in s[k]) if (s[k][key] !== undefined && s[k][key] !== '') out[k][key] = s[k][key];
+      if (s[k]) for (var key in s[k]) {
+        var v = s[k][key];
+        if (v !== undefined && (v !== '' || ALLOW_EMPTY.indexOf(key) >= 0)) out[k][key] = v;
+      }
     });
     if (s.matchCaseInsensitive !== undefined) out.matchCaseInsensitive = !!s.matchCaseInsensitive;
     return out;
@@ -256,13 +264,22 @@
   function match(fpdf, mpf, settings) {
     var s = mergeSettings(settings);
     var ci = s.matchCaseInsensitive;
+    var ignoreRe = null;
+    if (s.mpf.nameIgnorePattern) {
+      try { ignoreRe = new RegExp(s.mpf.nameIgnorePattern, 'i'); } catch (e) { /* geçersiz desen: yok say */ }
+    }
+    // Eşleştirme anahtarı: yardımcı ek atılır, gerisi birebir karşılaştırılır
+    function keyOf(name) {
+      var n = String(name || '').trim();
+      return normName(ignoreRe ? n.replace(ignoreRe, '') : n, ci);
+    }
     var exclusive = keywordList(s.mpf.exclusiveKeywords);
     var repeatable = String(s.mpf.repeatableKeyword || 'PSEN').toUpperCase();
     var warnings = [];
 
     var byName = Object.create(null);
     fpdf.points.forEach(function (pt) {
-      var key = normName(pt.name, ci);
+      var key = keyOf(pt.name);
       pt.processes = [];
       pt.psenCount = 0;       // PSEN satırı sayısı (yalnızca bilgi)
       pt.hasPsen = false;     // sayımlar ve gösterim bunu kullanır: PSEN yapılan pozisyon
@@ -277,7 +294,7 @@
       byName[key].push(pt);
     });
 
-    function lookup(name) { return byName[normName(name, ci)] || null; }
+    function lookup(name) { return byName[keyOf(name)] || null; }
 
     mpf.blocks.forEach(function (b) {
       var t = lookup(b.name);
@@ -286,7 +303,7 @@
 
     var unmatched = Object.create(null); // MPF'de olup FPDF'de olmayan isimler
     mpf.processes.forEach(function (proc) {
-      var key = normName(proc.name, ci);
+      var key = keyOf(proc.name);
       var targets = lookup(proc.name);
       if (!targets) {
         if (!unmatched[key]) unmatched[key] = { name: proc.name, processes: [] };

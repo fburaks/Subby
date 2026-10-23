@@ -9,11 +9,12 @@ Gereksinimler (Windows):
     - CATIA V5 açık olmalı
     - Python 3 ve pywin32:  py -m pip install pywin32
 
-Kullanım:
-    Çift tıklama                                       -> CSV dosyası seçme penceresi açılır
-    py proses3d_catia.py harita_catia.csv              -> aktif Part dokümanına aktarır
-    py proses3d_catia.py harita_catia.csv --yeni       -> yeni bir Part oluşturup oraya aktarır
-    py proses3d_catia.py --sembol-testi                -> CATIA sembol numaralarını gösteren test noktaları
+Kullanım: dosyayı çalıştırmanız yeterli (çift tıklama, IDE'de Run veya "py proses3d_catia.py").
+Adımlar en alttaki calistir() fonksiyonunda sırayla çalışır:
+    1) CSV dosyasını seç   2) CSV'yi oku   3) CATIA'ya bağlan   4) Hedef Part'ı al
+    5) Geometrik setleri ve noktaları oluştur   6) Renk ve sembolleri uygula
+Ayarlar aşağıdaki AYARLAR bölümünden değiştirilebilir. Komut satırından da verilebilir:
+    py proses3d_catia.py harita_catia.csv [--yeni] [--sembol-testi]
 
 Python kurulu değilse aynı işi CATIA içinden çalışan Proses3D_CATIA.CATScript makrosu yapar.
 
@@ -23,6 +24,11 @@ Nokta adları: <nokta adı>,<bağlayıcı tipi>,<proses>
 import csv
 import sys
 import traceback
+
+# ------------------------------------------------------------------ AYARLAR
+CSV_YOLU = ''          # boşsa dosya seçme penceresi açılır, ör. r'C:\Haritalar\Panel_A_harita_catia.csv'
+YENI_PART = False      # True: her zaman yeni bir Part oluştur
+SEMBOL_TESTI = False   # True: CSV yerine 1..13 numaralı sembolleri gösteren test noktaları oluştur
 
 # Proses 3D şekil adı -> CATIA nokta sembolü (VisPropertySet.SetSymbolType numarası).
 # Numaraların karşılığı CATIA sürümüne göre değişebilir. Emin olmak için önce
@@ -131,13 +137,9 @@ def guvenli_ad(ad):
     return ad.strip() or 'Nokta'
 
 
-def aktar(csv_yolu, yeni=False):
-    satirlar = csv_oku(csv_yolu)
-    catia = catia_baglan()
-    part = part_al(catia, yeni)
-    doc = part.Parent
+def setleri_olustur(part, satirlar):
+    """Ana geometrik seti, her grup için alt seti ve noktaları oluşturur."""
     hsf = part.HybridShapeFactory
-
     baslik = satirlar[0].get('Harita') or 'Harita'
     ana_set = part.HybridBodies.Add()
     ana_set.Name = guvenli_ad('Proses3D_' + baslik)
@@ -163,10 +165,13 @@ def aktar(csv_yolu, yeni=False):
             print('  %d / %d' % (i, len(satirlar)))
     print('Part güncelleniyor...')
     part.Update()
+    return ana_set, gruplar
 
-    # Renk ve sembolü her grup için tek seçimle uygula
+
+def renkleri_uygula(part, gruplar):
+    """Renk ve sembolü her grubun noktalarını birlikte seçerek uygular."""
     print('Renk ve semboller uygulanıyor...')
-    sel = doc.Selection
+    sel = part.Parent.Selection
     for ad, g in gruplar.items():
         sel.Clear()
         for n in g['noktalar']:
@@ -176,7 +181,6 @@ def aktar(csv_yolu, yeni=False):
         vis.SetSymbolType(g['sembol'])
         print('  %-28s %5d nokta  RGB%s  sembol %d' % (ad, len(g['noktalar']), g['renk'], g['sembol']))
     sel.Clear()
-    print('Tamamlandı: "%s" geometrik seti, %d nokta.' % (ana_set.Name, len(satirlar)))
 
 
 def sembol_testi():
@@ -202,23 +206,36 @@ def sembol_testi():
     print('Sembol_1 ... Sembol_13 noktaları oluşturuldu. SEMBOLLER tablosunu buna göre düzenleyin.')
 
 
-def main(argv):
+def calistir():
+    """Tüm adımları sırayla çalıştırır."""
+    argv = sys.argv[1:]
     dosyalar = [a for a in argv if not a.startswith('--')]
-    if '--sembol-testi' in argv:
+
+    if SEMBOL_TESTI or '--sembol-testi' in argv:
         sembol_testi()
         return
-    if not dosyalar:
-        # Çift tıklamayla açıldı: dosya seçtir
-        yol = csv_sec()
-        if not yol:
-            raise Hata('CSV dosyası seçilmedi.')
-        dosyalar = [yol]
-    aktar(dosyalar[0], yeni='--yeni' in argv)
+
+    # 1) CSV dosyasını belirle
+    yol = dosyalar[0] if dosyalar else (CSV_YOLU or csv_sec())
+    if not yol:
+        raise Hata('CSV dosyası seçilmedi.')
+    # 2) CSV'yi oku
+    satirlar = csv_oku(yol)
+    # 3) CATIA'ya bağlan
+    catia = catia_baglan()
+    # 4) Hedef Part'ı al
+    part = part_al(catia, YENI_PART or '--yeni' in argv)
+    # 5) Geometrik setleri ve noktaları oluştur
+    ana_set, gruplar = setleri_olustur(part, satirlar)
+    # 6) Renk ve sembolleri uygula
+    renkleri_uygula(part, gruplar)
+    print('Tamamlandı: "%s" geometrik seti, %d nokta.' % (ana_set.Name, len(satirlar)))
 
 
-if __name__ == '__main__':
+def calistir_ve_bekle():
+    print('Proses 3D -> CATIA aktarımı başlıyor...')
     try:
-        main(sys.argv[1:])
+        calistir()
     except Hata as e:
         print('\nHATA: %s' % e)
     except Exception:
@@ -227,5 +244,9 @@ if __name__ == '__main__':
     # Çift tıklamayla açılan pencere hemen kapanmasın
     try:
         input('\nKapatmak için Enter\'a basın...')
-    except EOFError:
+    except (EOFError, RuntimeError):
         pass
+
+
+# Dosya nasıl çalıştırılırsa çalıştırılsın (çift tıklama, IDE'de Run, py komutu) adımlar sırayla çalışır
+calistir_ve_bekle()

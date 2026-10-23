@@ -46,6 +46,9 @@ Kaynaklar değiştirildikten sonra tek dosya `node proses3d/build.js` ile yenide
 
 ### Eşleştirme ve kurallar
 - FPDF ve MPF, bağlayıcı ismi üzerinden **birebir** eşleştirilir; en küçük fark varsa eşleşmez.
+  Tek istisna isim sonundaki yardımcı kodlardır: `_cn`, `_cp` ve ardından gelen rakamlar
+  (`Point_No--Fst-1962_cn1`, `..._cp12`, `..._cn1_cp2`) eşleştirmede atılır. Desen
+  *MPF kuralları → Yok sayılan ek* alanından değiştirilebilir veya boş bırakılarak kapatılabilir.
   (İstenirse *MPF kuralları → Harf farkını yok say* açılabilir.)
 - `PSEN` bir noktada 0 veya daha fazla kez olabilir; sayımlarda **bir kez** sayılır
   (amaç PSEN yapılan pozisyon sayısıdır).
@@ -98,8 +101,9 @@ CGR kapalı bir format olduğu için doğrudan okunamaz. CATIA'dan:
      `Proses3D_CATIA.CATScript` dosyasını indirin. CATIA'da hedef CATPart açıkken
      *Tools → Macro → Macros…* (`Alt+F8`) → *Macro libraries…* ile dosyanın klasörünü ekleyin,
      makroyu seçip *Run*'a basın ve CSV'yi seçin.
-   - **Python betiği:** Python 3 ve `py -m pip install pywin32` gerekir. `proses3d_catia.py`'ye çift
-     tıklayın (CSV seçme penceresi açılır) veya `py proses3d_catia.py dosya_catia.csv [--yeni]`.
+   - **Python betiği:** Python 3 ve `py -m pip install pywin32` gerekir. Dosyayı çalıştırmanız yeterli
+     (çift tıklama, IDE'de Run veya `py proses3d_catia.py`): adımlar sırayla çalışır, CSV seçme penceresi
+     açılır. Betiğin başındaki `CSV_YOLU`, `YENI_PART`, `SEMBOL_TESTI` ayarları değiştirilebilir.
      Pencere sonunda açık kalır; hata varsa orada yazar.
 3. Sonuç: `Proses3D_<başlık>` geometrik seti, içinde her renk/sembol grubu için bir alt set.
    Nokta adları `<nokta adı>,<bağlayıcı tipi>,<proses>` (ör. `Point_No--Fst-1962,P20,CS`); bağlayıcı

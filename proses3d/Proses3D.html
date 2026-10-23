@@ -228,9 +228,10 @@ body.viewer #info { top: 52px; }
           <option value="position">Pozisyon satırı (AXPOS/LIN)</option>
           <option value="process">Proses satırı</option>
         </select>
+        <label>Yok sayılan ek</label><input id="cfgIgnore" type="text" title="Eşleştirmede isim sonundan atılan yardımcı kodlar (regex). Boş bırakılırsa kapalı.">
         <label>Harf farkını yok say</label><input id="cfgCI" type="checkbox">
       </div>
-      <p class="hint">İsim, satırdaki <code>;</code> işaretinden sonra gelen metindir (baştaki <code>-</code> atılır). FPDF ve MPF isimleri birebir aynı olmalıdır. <code>N023540 ;PDP(...)</code> gibi yoruma alınmış komutlar yok sayılır. Bir pozisyon satırından sonraki prosesler, bir sonraki pozisyon satırına kadar o bağlayıcıya aittir.</p>
+      <p class="hint">İsim, satırdaki <code>;</code> işaretinden sonra gelen metindir (baştaki <code>-</code> atılır). FPDF ve MPF isimleri birebir aynı olmalıdır; yalnızca sondaki <code>_cn1</code>, <code>_cp12</code> gibi yardımcı kodlar (<i>Yok sayılan ek</i>) atılır. <code>N023540 ;PDP(...)</code> gibi yoruma alınmış komutlar yok sayılır. Bir pozisyon satırından sonraki prosesler, bir sonraki pozisyon satırına kadar o bağlayıcıya aittir.</p>
       <div class="row"><button id="btnApply" class="btn primary">Uygula / Yeniden işle</button><button id="btnReset" class="btn">Varsayılan</button></div>
     </details>
 
@@ -10233,11 +10234,16 @@ body.viewer #info { top: 52px; }
       exclusiveKeywords: 'CS,DONLY,DNOCLAMP',
       repeatableKeyword: 'PSEN',
       // 'auto' | 'position' | 'process'
-      nameSource: 'auto'
+      nameSource: 'auto',
+      // Eşleştirmede yok sayılacak isim eki (regex). MPF isimlerine eklenebilen yardımcı
+      // kodlar: "Point_No--Fst-1962_cn1", "..._cp12", "..._cn1_cp2" -> "Point_No--Fst-1962"
+      nameIgnorePattern: '(_(cn|cp)\\d*)+$'
     },
     // İsimler birebir eşleşmeli; true yapılırsa büyük/küçük harf farkı yok sayılır
     matchCaseInsensitive: false
   };
+
+  var ALLOW_EMPTY = ['nameIgnorePattern']; // boş bırakılarak kapatılabilen ayarlar
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
@@ -10245,7 +10251,10 @@ body.viewer #info { top: 52px; }
     var out = clone(DEFAULTS);
     if (!s) return out;
     ['fpdf', 'mpf'].forEach(function (k) {
-      if (s[k]) for (var key in s[k]) if (s[k][key] !== undefined && s[k][key] !== '') out[k][key] = s[k][key];
+      if (s[k]) for (var key in s[k]) {
+        var v = s[k][key];
+        if (v !== undefined && (v !== '' || ALLOW_EMPTY.indexOf(key) >= 0)) out[k][key] = v;
+      }
     });
     if (s.matchCaseInsensitive !== undefined) out.matchCaseInsensitive = !!s.matchCaseInsensitive;
     return out;
@@ -10460,13 +10469,22 @@ body.viewer #info { top: 52px; }
   function match(fpdf, mpf, settings) {
     var s = mergeSettings(settings);
     var ci = s.matchCaseInsensitive;
+    var ignoreRe = null;
+    if (s.mpf.nameIgnorePattern) {
+      try { ignoreRe = new RegExp(s.mpf.nameIgnorePattern, 'i'); } catch (e) { /* geçersiz desen: yok say */ }
+    }
+    // Eşleştirme anahtarı: yardımcı ek atılır, gerisi birebir karşılaştırılır
+    function keyOf(name) {
+      var n = String(name || '').trim();
+      return normName(ignoreRe ? n.replace(ignoreRe, '') : n, ci);
+    }
     var exclusive = keywordList(s.mpf.exclusiveKeywords);
     var repeatable = String(s.mpf.repeatableKeyword || 'PSEN').toUpperCase();
     var warnings = [];
 
     var byName = Object.create(null);
     fpdf.points.forEach(function (pt) {
-      var key = normName(pt.name, ci);
+      var key = keyOf(pt.name);
       pt.processes = [];
       pt.psenCount = 0;       // PSEN satırı sayısı (yalnızca bilgi)
       pt.hasPsen = false;     // sayımlar ve gösterim bunu kullanır: PSEN yapılan pozisyon
@@ -10481,7 +10499,7 @@ body.viewer #info { top: 52px; }
       byName[key].push(pt);
     });
 
-    function lookup(name) { return byName[normName(name, ci)] || null; }
+    function lookup(name) { return byName[keyOf(name)] || null; }
 
     mpf.blocks.forEach(function (b) {
       var t = lookup(b.name);
@@ -10490,7 +10508,7 @@ body.viewer #info { top: 52px; }
 
     var unmatched = Object.create(null); // MPF'de olup FPDF'de olmayan isimler
     mpf.processes.forEach(function (proc) {
-      var key = normName(proc.name, ci);
+      var key = keyOf(proc.name);
       var targets = lookup(proc.name);
       if (!targets) {
         if (!unmatched[key]) unmatched[key] = { name: proc.name, processes: [] };
@@ -10575,11 +10593,12 @@ Gereksinimler (Windows):
     - CATIA V5 açık olmalı
     - Python 3 ve pywin32:  py -m pip install pywin32
 
-Kullanım:
-    Çift tıklama                                       -> CSV dosyası seçme penceresi açılır
-    py proses3d_catia.py harita_catia.csv              -> aktif Part dokümanına aktarır
-    py proses3d_catia.py harita_catia.csv --yeni       -> yeni bir Part oluşturup oraya aktarır
-    py proses3d_catia.py --sembol-testi                -> CATIA sembol numaralarını gösteren test noktaları
+Kullanım: dosyayı çalıştırmanız yeterli (çift tıklama, IDE'de Run veya "py proses3d_catia.py").
+Adımlar en alttaki calistir() fonksiyonunda sırayla çalışır:
+    1) CSV dosyasını seç   2) CSV'yi oku   3) CATIA'ya bağlan   4) Hedef Part'ı al
+    5) Geometrik setleri ve noktaları oluştur   6) Renk ve sembolleri uygula
+Ayarlar aşağıdaki AYARLAR bölümünden değiştirilebilir. Komut satırından da verilebilir:
+    py proses3d_catia.py harita_catia.csv [--yeni] [--sembol-testi]
 
 Python kurulu değilse aynı işi CATIA içinden çalışan Proses3D_CATIA.CATScript makrosu yapar.
 
@@ -10589,6 +10608,11 @@ Nokta adları: <nokta adı>,<bağlayıcı tipi>,<proses>
 import csv
 import sys
 import traceback
+
+# ------------------------------------------------------------------ AYARLAR
+CSV_YOLU = ''          # boşsa dosya seçme penceresi açılır, ör. r'C:\Haritalar\Panel_A_harita_catia.csv'
+YENI_PART = False      # True: her zaman yeni bir Part oluştur
+SEMBOL_TESTI = False   # True: CSV yerine 1..13 numaralı sembolleri gösteren test noktaları oluştur
 
 # Proses 3D şekil adı -> CATIA nokta sembolü (VisPropertySet.SetSymbolType numarası).
 # Numaraların karşılığı CATIA sürümüne göre değişebilir. Emin olmak için önce
@@ -10697,13 +10721,9 @@ def guvenli_ad(ad):
     return ad.strip() or 'Nokta'
 
 
-def aktar(csv_yolu, yeni=False):
-    satirlar = csv_oku(csv_yolu)
-    catia = catia_baglan()
-    part = part_al(catia, yeni)
-    doc = part.Parent
+def setleri_olustur(part, satirlar):
+    """Ana geometrik seti, her grup için alt seti ve noktaları oluşturur."""
     hsf = part.HybridShapeFactory
-
     baslik = satirlar[0].get('Harita') or 'Harita'
     ana_set = part.HybridBodies.Add()
     ana_set.Name = guvenli_ad('Proses3D_' + baslik)
@@ -10729,10 +10749,13 @@ def aktar(csv_yolu, yeni=False):
             print('  %d / %d' % (i, len(satirlar)))
     print('Part güncelleniyor...')
     part.Update()
+    return ana_set, gruplar
 
-    # Renk ve sembolü her grup için tek seçimle uygula
+
+def renkleri_uygula(part, gruplar):
+    """Renk ve sembolü her grubun noktalarını birlikte seçerek uygular."""
     print('Renk ve semboller uygulanıyor...')
-    sel = doc.Selection
+    sel = part.Parent.Selection
     for ad, g in gruplar.items():
         sel.Clear()
         for n in g['noktalar']:
@@ -10742,7 +10765,6 @@ def aktar(csv_yolu, yeni=False):
         vis.SetSymbolType(g['sembol'])
         print('  %-28s %5d nokta  RGB%s  sembol %d' % (ad, len(g['noktalar']), g['renk'], g['sembol']))
     sel.Clear()
-    print('Tamamlandı: "%s" geometrik seti, %d nokta.' % (ana_set.Name, len(satirlar)))
 
 
 def sembol_testi():
@@ -10768,23 +10790,36 @@ def sembol_testi():
     print('Sembol_1 ... Sembol_13 noktaları oluşturuldu. SEMBOLLER tablosunu buna göre düzenleyin.')
 
 
-def main(argv):
+def calistir():
+    """Tüm adımları sırayla çalıştırır."""
+    argv = sys.argv[1:]
     dosyalar = [a for a in argv if not a.startswith('--')]
-    if '--sembol-testi' in argv:
+
+    if SEMBOL_TESTI or '--sembol-testi' in argv:
         sembol_testi()
         return
-    if not dosyalar:
-        # Çift tıklamayla açıldı: dosya seçtir
-        yol = csv_sec()
-        if not yol:
-            raise Hata('CSV dosyası seçilmedi.')
-        dosyalar = [yol]
-    aktar(dosyalar[0], yeni='--yeni' in argv)
+
+    # 1) CSV dosyasını belirle
+    yol = dosyalar[0] if dosyalar else (CSV_YOLU or csv_sec())
+    if not yol:
+        raise Hata('CSV dosyası seçilmedi.')
+    # 2) CSV'yi oku
+    satirlar = csv_oku(yol)
+    # 3) CATIA'ya bağlan
+    catia = catia_baglan()
+    # 4) Hedef Part'ı al
+    part = part_al(catia, YENI_PART or '--yeni' in argv)
+    # 5) Geometrik setleri ve noktaları oluştur
+    ana_set, gruplar = setleri_olustur(part, satirlar)
+    # 6) Renk ve sembolleri uygula
+    renkleri_uygula(part, gruplar)
+    print('Tamamlandı: "%s" geometrik seti, %d nokta.' % (ana_set.Name, len(satirlar)))
 
 
-if __name__ == '__main__':
+def calistir_ve_bekle():
+    print('Proses 3D -> CATIA aktarımı başlıyor...')
     try:
-        main(sys.argv[1:])
+        calistir()
     except Hata as e:
         print('\nHATA: %s' % e)
     except Exception:
@@ -10793,8 +10828,12 @@ if __name__ == '__main__':
     # Çift tıklamayla açılan pencere hemen kapanmasın
     try:
         input('\nKapatmak için Enter\'a basın...')
-    except EOFError:
+    except (EOFError, RuntimeError):
         pass
+
+
+# Dosya nasıl çalıştırılırsa çalıştırılsın (çift tıklama, IDE'de Run, py komutu) adımlar sırayla çalışır
+calistir_ve_bekle()
 </script>
 <script type="text/plain" id="catiaVbs">
 Language="VBSCRIPT"
@@ -11530,7 +11569,8 @@ End Sub
     // MPF'deki makine ekseni pozisyonları (3D görünüm FPDF tasarım eksenini kullanır)
     p.blocks.forEach(function (b) {
       if (!b.machine) return;
-      html += '<div class="muted" style="font-size:11px">Makine ' + esc(b.keyword) + ' (' + esc(loc(b)) + '): ' +
+      html += '<div class="muted" style="font-size:11px">Makine ' + esc(b.keyword) + ' (' + esc(loc(b)) + ')' +
+        (b.name !== p.name ? ' [' + esc(b.name) + ']' : '') + ': ' +
         b.machine.map(fmt).join(', ') + '</div>';
     });
     if (p.processes.length) {
@@ -11769,7 +11809,8 @@ End Sub
     ['cfgX', 'fpdf', 'xCol', true], ['cfgY', 'fpdf', 'yCol', true], ['cfgZ', 'fpdf', 'zCol', true],
     ['cfgType', 'fpdf', 'typeCol', 'zero'],
     ['cfgPos', 'mpf', 'positionKeywords'], ['cfgProcKw', 'mpf', 'processKeywords'],
-    ['cfgExcl', 'mpf', 'exclusiveKeywords'], ['cfgRep', 'mpf', 'repeatableKeyword'], ['cfgNameSrc', 'mpf', 'nameSource']
+    ['cfgExcl', 'mpf', 'exclusiveKeywords'], ['cfgRep', 'mpf', 'repeatableKeyword'], ['cfgNameSrc', 'mpf', 'nameSource'],
+    ['cfgIgnore', 'mpf', 'nameIgnorePattern', 'text0']
   ];
   function settingsToForm() {
     FORM.forEach(function (f) { $(f[0]).value = state.settings[f[1]][f[2]]; });
@@ -11778,6 +11819,7 @@ End Sub
   function formToSettings() {
     FORM.forEach(function (f) {
       var v = $(f[0]).value;
+      if (f[3] === 'text0') { state.settings[f[1]][f[2]] = v.trim(); return; }
       if (f[3]) { v = parseInt(v, 10); if (!(v >= (f[3] === 'zero' ? 0 : 1))) return; }
       state.settings[f[1]][f[2]] = v;
     });
